@@ -75,7 +75,13 @@ publishing {
 
 bintray {
   user = "programingjd"
-  key = { "" }()
+  key = {
+    "bintrayApiKey".let { key: String ->
+      File("local.properties").readLines().findLast {
+        it.startsWith("${key}=")
+      }?.substring(key.length + 1)
+    }
+  }()
   dryRun = true
   publish = true
   setPublications("mavenJava")
