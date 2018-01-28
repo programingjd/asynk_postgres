@@ -55,6 +55,37 @@ sealed class Message {
     override fun toString() = "AuthenticationSSPI"
   }
 
+  class ParameterStatus(val key: String, val value: String): FromServer, Message() {
+    override fun toString() = "ParameterStatus(key: ${key}, value: ${value})"
+  }
+
+  class BackendKeyData(val processId: Int, val secretKey: Int): FromServer, Message() {
+    override fun toString() = "BackendKeyData(processId: ${processId}, secretKey: ${secretKey})"
+  }
+
+  class ReadyForQuery(val status: Status): FromServer, Message() {
+    override fun toString() = "ReadyForQuery(status: ${status})"
+    enum class Status {
+      IDLE, IN_TRANSACTION, IN_FAILED_TRANSACTION;
+      companion object {
+        internal fun from(b: Byte): Status {
+          return when (b) {
+            'I'.toByte() -> IDLE
+            'T'.toByte() -> IN_TRANSACTION
+            'E'.toByte() -> IN_FAILED_TRANSACTION
+            else -> throw IllegalArgumentException()
+          }
+        }
+      }
+    }
+  }
+
+  class ErrorResponse(private val message: String): FromServer, Message() {
+    override fun toString() = "ErrorResponse(){\n${message}\n}"
+  }
+
+  //--------------------------------------------------------------------------------------------------
+
   class PasswordMessage(val username: String, val password: String,
                         val authMessage: Authentication): FromClient, Message() {
     override fun toString() = "PasswordMessage(username: ${username})"
@@ -81,30 +112,7 @@ sealed class Message {
     }
   }
 
-  class ParameterStatus(val key: String, val value: String): FromServer, Message() {
-    override fun toString() = "ParameterStatus(key: ${key}, value: ${value})"
-  }
 
-  class BackendKeyData(val processId: Int, val secretKey: Int): FromServer, Message() {
-    override fun toString() = "BackendKeyData(processId: ${processId}, secretKey: ${secretKey})"
-  }
-
-  class ReadyForQuery(val status: Status): FromServer, Message() {
-    override fun toString() = "ReadyForQuery(status: ${status})"
-    enum class Status {
-      IDLE, IN_TRANSACTION, IN_FAILED_TRANSACTION;
-      companion object {
-        internal fun from(b: Byte): Status {
-          return when (b) {
-            'I'.toByte() -> IDLE
-            'T'.toByte() -> IN_TRANSACTION
-            'E'.toByte() -> IN_FAILED_TRANSACTION
-            else -> throw IllegalArgumentException()
-          }
-        }
-      }
-    }
-  }
 
   companion object {
     @Suppress("UsePropertyAccessSyntax")
@@ -175,6 +183,43 @@ sealed class Message {
           assert(length == 5)
           val status = ReadyForQuery.Status.from(buffer.get())
           return ReadyForQuery(status)
+        }
+        'E'.toByte() -> {
+          val length = buffer.getInt()
+          val data = ByteArray(length - 4)
+          buffer.get(data)
+          val message = StringBuilder()
+          var sb = StringBuilder()
+          for (b in data) {
+            if (sb.isEmpty()) {
+              when (b) {
+                'S'.toByte() -> message.append("SEVERITY: ")
+                'C'.toByte() -> message.append("SQLSTATE ERROR CODE: ")
+                'M'.toByte() -> message.append("MESSAGE: ")
+                'D'.toByte() -> message.append("DETAIL: ")
+                'P'.toByte() -> message.append("POSITION: ")
+                'p'.toByte() -> message.append("INTERNAL POSITION: ")
+                'q'.toByte() -> message.append("INTERNAL QUERY: ")
+                'W'.toByte() -> message.append("WHERE: ")
+                's'.toByte() -> message.append("SCHEMA NAME: ")
+                't'.toByte() -> message.append("TABLE NAME: ")
+                'c'.toByte() -> message.append("COLUMN NAME: ")
+                'd'.toByte() -> message.append("DATA TYPE NAME: ")
+                'n'.toByte() -> message.append("CONSTRAINT NAME: ")
+                'F'.toByte() -> message.append("FILE: ")
+                'L'.toByte() -> message.append("LINE: ")
+                'R'.toByte() -> message.append("ROUTINE: ")
+              }
+            }
+            else {
+              if (b == 0.toByte()) {
+                message.append(sb)
+                message.append('\n')
+                sb = StringBuilder()
+              }
+            }
+          }
+          return ErrorResponse(message.toString())
         }
         else -> throw IllegalArgumentException()
       }
