@@ -25,8 +25,8 @@ repositories {
 
 dependencies {
   compile(kotlin("stdlib-jdk8"))
-  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:0.22")
-  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-nio:0.22")
+  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:0.22.1")
+  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-nio:0.22.1")
   implementation("org.slf4j:slf4j-api:1.7.25")
   testImplementation("junit:junit:4.12")
   testRuntime("org.slf4j:slf4j-jdk14:1.7.25")
@@ -43,6 +43,7 @@ val sourcesJar by tasks.creating(Jar::class) {
 
 val javadocJar by tasks.creating(Jar::class) {
   classifier = "javadoc"
+  from(java.docsDir)
 }
 
 tasks.withType(KotlinJvmCompile::class.java).all {
