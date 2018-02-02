@@ -1,66 +1,63 @@
 package info.jdavid.postgres
 
-import kotlinx.coroutines.experimental.nio.aConnect
-import kotlinx.coroutines.experimental.nio.aRead
-import kotlinx.coroutines.experimental.nio.aWrite
 import kotlinx.coroutines.experimental.runBlocking
-import java.net.InetAddress
-import java.net.InetSocketAddress
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
-import java.nio.channels.AsynchronousSocketChannel
 
 fun main(args: Array<String>) {
   val username = "postgres"
   val password = "postgres"
   val database = "postgres"
   runBlocking {
-    val send = ByteBuffer.allocate(4096).order(ByteOrder.BIG_ENDIAN)
-    val receive = ByteBuffer.allocate(4096).order(ByteOrder.BIG_ENDIAN)
-    val channel = AsynchronousSocketChannel.open()
-    channel.aConnect(InetSocketAddress(InetAddress.getLoopbackAddress(), 5432))
-
-    val ref = ByteBuffer.allocate(1024).order(ByteOrder.BIG_ENDIAN).let {
-      it.putInt(0)
-      it.putInt(196608)
-      it.put(bytes("user"))
-      it.put(0)
-      it.put(bytes("postgres"))
-      it.put(0)
-      it.put(bytes("database"))
-      it.put(0)
-      it.put(bytes("postgres"))
-      it.put(0)
-      it.put(0)
-      it.putInt(0, send.position())
-      it.flip()
-      it
+    Authentication.Credentials.PasswordCredentials(username, password).
+      connectTo(database).use {
+      println(it.parameters())
     }
 
-    Message.StartupMessage(username, database).writeTo(send)
-    send.flip()
-    channel.aWrite(send, 0)
-    send.clear()
-    receive.clear()
-    channel.aRead(receive)
-    receive.flip()
-    Message.PasswordMessage(username, password, Message.fromBytes(receive) as Message.Authentication).
-      writeTo(send)
-    send.flip()
-    channel.aWrite(send, 0)
-    send.clear()
-    receive.clear()
-    channel.aRead(receive)
-    receive.flip()
-    val ok = Message.fromBytes(receive) as Message.AuthenticationOk
-    while (receive.remaining() > 0) {
-      println(Message.fromBytes(receive))
-    }
-
-    val array = ByteArray(receive.remaining())
-    receive.get(array)
-    println(String(array, Charsets.US_ASCII).toCharArray().map { c(it) }.joinToString(""))
-    println(hex(array))
+//    val send = ByteBuffer.allocate(4096).order(ByteOrder.BIG_ENDIAN)
+//    val receive = ByteBuffer.allocate(4096).order(ByteOrder.BIG_ENDIAN)
+//    val channel = AsynchronousSocketChannel.open()
+//    channel.aConnect(InetSocketAddress(InetAddress.getLoopbackAddress(), 5432))
+//
+//    val ref = ByteBuffer.allocate(1024).order(ByteOrder.BIG_ENDIAN).let {
+//      it.putInt(0)
+//      it.putInt(196608)
+//      it.put(bytes("user"))
+//      it.put(0)
+//      it.put(bytes("postgres"))
+//      it.put(0)
+//      it.put(bytes("database"))
+//      it.put(0)
+//      it.put(bytes("postgres"))
+//      it.put(0)
+//      it.put(0)
+//      it.putInt(0, send.position())
+//      it.flip()
+//      it
+//    }
+//
+//    Message.StartupMessage(username, database).writeTo(send)
+//    send.flip()
+//    channel.aWrite(send, 0)
+//    send.clear()
+//    receive.clear()
+//    channel.aRead(receive)
+//    receive.flip()
+//    Message.PasswordMessage(username, password, Message.fromBytes(receive) as Message.Authentication).
+//      writeTo(send)
+//    send.flip()
+//    channel.aWrite(send, 0)
+//    send.clear()
+//    receive.clear()
+//    channel.aRead(receive)
+//    receive.flip()
+//    val ok = Message.fromBytes(receive) as Message.AuthenticationOk
+//    while (receive.remaining() > 0) {
+//      println(Message.fromBytes(receive))
+//    }
+//
+//    val array = ByteArray(receive.remaining())
+//    receive.get(array)
+//    println(String(array, Charsets.US_ASCII).toCharArray().map { c(it) }.joinToString(""))
+//    println(hex(array))
   }
 }
 

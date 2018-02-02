@@ -59,8 +59,10 @@ sealed class Message {
     override fun toString() = "ParameterStatus(key: ${key}, value: ${value})"
   }
 
-  class BackendKeyData(val processId: Int, val secretKey: Int): FromServer, Message() {
+  class BackendKeyData(private val processId: Int, private val secretKey: Int): FromServer, Message() {
     override fun toString() = "BackendKeyData(processId: ${processId}, secretKey: ${secretKey})"
+    operator fun component1(): Int = processId
+    operator fun component2(): Int = secretKey
   }
 
   class ReadyForQuery(val status: Status): FromServer, Message() {
@@ -116,7 +118,7 @@ sealed class Message {
 
   companion object {
     @Suppress("UsePropertyAccessSyntax")
-    fun fromBytes(buffer: ByteBuffer): Message {
+    internal fun fromBytes(buffer: ByteBuffer): Message.FromServer {
       val first = buffer.get()
       when (first) {
         'R'.toByte() -> { // authentication
@@ -221,7 +223,7 @@ sealed class Message {
           }
           return ErrorResponse(message.toString())
         }
-        else -> throw IllegalArgumentException()
+        else -> throw IllegalArgumentException("${first.toChar()}")
       }
     }
 
