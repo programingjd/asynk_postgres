@@ -100,7 +100,7 @@ sealed class Message {
   class Sync: FromClient, Message() {
     override fun toString() = "Sync"
     override fun writeTo(buffer: ByteBuffer) {
-      buffer.put('F'.toByte())
+      buffer.put('S'.toByte())
       buffer.putInt(4)
     }
   }
@@ -161,7 +161,7 @@ sealed class Message {
       return "Bind(${preparedStatementName ?: "unamed"}): ${params.joinToString(", ")}"
     }
     override fun writeTo(buffer: ByteBuffer) {
-      buffer.put('F'.toByte())
+      buffer.put('B'.toByte())
       val start = buffer.position()
       buffer.putInt(0)
       // unamed portal

@@ -27,14 +27,14 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
   }
 
   suspend fun query(sqlStatement: String, vararg params: Any?): Map<String, Any?> {
-    prepare(sqlStatement)
-    bind(null, params)
-    val messages = receive()
-    println(messages.size)
-    return emptyMap()
+    val statement = prepare(sqlStatement)
+    return query(statement, params)
   }
 
   suspend fun query(preparedStatement: PreparedStatement, vararg params: Any?): Map<String, Any?> {
+    bind(preparedStatement.name, params)
+    val messages = receive()
+    println(messages.size)
     return emptyMap()
   }
 
@@ -44,13 +44,13 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
     send(Message.Sync())
     val messages = receive()
     messages.find { it is Message.ParseComplete } ?: throw exception(messages)
+    messages.find { it is Message.ReadyForQuery } ?: throw exception(messages)
     messages.forEach {
       when (it) {
         is Message.ErrorResponse -> throw RuntimeException("Error parsing statement:\n${sqlStatement}\n${it}")
         is Message.NoticeResponse -> warn("Statement:\n${sqlStatement}\n${it}")
       }
     }
-    messages.find { it is Message.ErrorResponse } ?: throw exception(messages)
     return PreparedStatement(name)
   }
 
