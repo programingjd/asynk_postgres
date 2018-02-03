@@ -34,6 +34,7 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
   suspend fun query(preparedStatement: PreparedStatement,
                     params: Iterable<Any?> = emptyList()): Map<String, Any?> {
     bind(preparedStatement.name, params)
+    val messages = execute()
     return emptyMap()
   }
 
@@ -57,7 +58,7 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
     send(Message.Bind(name?.toByteArray(Charsets.US_ASCII), params))
     send(Message.Sync())
     val messages = receive()
-    messages.find { it is Message.ParseComplete } ?: throw exception(messages)
+    messages.find { it is Message.BindComplete } ?: throw exception(messages)
     messages.find { it is Message.ReadyForQuery } ?: throw exception(messages)
     messages.forEach {
       when (it) {
@@ -65,6 +66,18 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
         is Message.NoticeResponse -> warn("Bind:\n${it}")
       }
     }
+  }
+
+  private suspend fun execute(): List<Message.FromServer> {
+    send(Message.Execute())
+    val messages = receive()
+    messages.forEach {
+      when (it) {
+        is Message.ErrorResponse -> throw RuntimeException("Error executing statement:\n${it}")
+        is Message.NoticeResponse -> warn("Execute:\n${it}")
+      }
+    }
+    return messages
   }
 
   internal suspend fun send(message: Message.FromClient) {

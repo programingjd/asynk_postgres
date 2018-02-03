@@ -192,6 +192,18 @@ sealed class Message {
     }
   }
 
+  class Execute: FromClient, Message() {
+    override fun toString() = "Execute"
+    override fun writeTo(buffer: ByteBuffer) {
+      buffer.put('E'.toByte())
+      val start = buffer.position()
+      buffer.putInt(0)
+      buffer.put(0) // unamed portal
+      buffer.putInt(0) // no lmit on number of rows
+      buffer.putInt(start, buffer.position() - start)
+    }
+  }
+
   //--------------------------------------------------------------------------------------------------
 
   companion object {
