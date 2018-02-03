@@ -3,7 +3,7 @@ package info.jdavid.postgres
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
-import java.util.*
+import java.util.Date
 
 internal object TextFormat {
 
@@ -21,6 +21,7 @@ internal object TextFormat {
       is DoubleArray -> formatArray(value)
       is Array<*> -> formatArray(value)
       is Iterable<*> -> formatArray(value)
+      is Sequence<*> -> formatArray(value)
       else -> value.toString()
     }
   }
@@ -46,6 +47,8 @@ internal object TextFormat {
     atOffset(ZoneOffset.UTC).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
 
   fun formatByteArray(bytes: ByteArray) = "\\x${Message.hex(bytes).toUpperCase()}"
+
+  fun formatArray(array: Sequence<*>) = array.map(escape).joinToString(",", "{", "}")
 
   fun formatArray(array: Iterable<*>) = array.map(escape).joinToString(",", "{", "}")
 
