@@ -87,6 +87,10 @@ sealed class Message {
     override fun toString() = "ParseComplete"
   }
 
+  class BindComplete: FromServer, Message() {
+    override fun toString() = "BindComplete"
+  }
+
   class NoticeResponse(private val message: String): FromServer, Message() {
     override fun toString() = "NoticeResponse(){\n${message}}"
   }
@@ -131,7 +135,8 @@ sealed class Message {
     }
   }
 
-  class Parse(val preparedStatementName: ByteArray?, val query: String): FromClient, Message() {
+  class Parse(private val preparedStatementName: ByteArray?,
+              private val query: String): FromClient, Message() {
     override fun toString() = "Parse(${preparedStatementName ?: "unamed"}): ${query}"
     override fun writeTo(buffer: ByteBuffer) {
       buffer.put('P'.toByte())
@@ -146,7 +151,8 @@ sealed class Message {
     }
   }
 
-  class Bind(val preparedStatementName: ByteArray?, vararg val parameters: Any?): FromClient, Message() {
+  class Bind(private val preparedStatementName: ByteArray?,
+             private val parameters: Iterable<Any?>): FromClient, Message() {
     override fun toString(): String {
       val params = parameters.map {
         return when (it) {
@@ -169,14 +175,18 @@ sealed class Message {
       preparedStatementName?.apply { buffer.put(this) }
       buffer.put(0)
       buffer.putShort(0) // no input format code specified
-      buffer.putShort(parameters.size.toShort())
+      val position = buffer.position()
+      buffer.putShort(0)
+      var i = 0.toShort()
       for (p in parameters) {
+        ++i
         if (p == null) buffer.putInt(-1) else {
           val bytes = TextFormat.format(p).toByteArray()
           buffer.putInt(bytes.size)
           buffer.put(bytes)
         }
       }
+      buffer.putShort(position, i)
       buffer.putShort(0) // no output format code specified
       buffer.putInt(start, buffer.position() - start)
     }
@@ -258,6 +268,11 @@ sealed class Message {
           val length = buffer.getInt()
           assert(length == 4)
           return ParseComplete()
+        }
+        '2'.toByte() -> {
+          val length = buffer.getInt()
+          assert(length == 4)
+          return BindComplete()
         }
         'N'.toByte(), 'E'.toByte() -> {
           val length = buffer.getInt()

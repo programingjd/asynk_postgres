@@ -26,15 +26,14 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
     return props.toMap()
   }
 
-  suspend fun query(sqlStatement: String, vararg params: Any?): Map<String, Any?> {
+  suspend fun query(sqlStatement: String, params: Iterable<Any?> = emptyList()): Map<String, Any?> {
     val statement = prepare(sqlStatement)
     return query(statement, params)
   }
 
-  suspend fun query(preparedStatement: PreparedStatement, vararg params: Any?): Map<String, Any?> {
+  suspend fun query(preparedStatement: PreparedStatement,
+                    params: Iterable<Any?> = emptyList()): Map<String, Any?> {
     bind(preparedStatement.name, params)
-    val messages = receive()
-    println(messages.size)
     return emptyMap()
   }
 
@@ -54,8 +53,18 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
     return PreparedStatement(name)
   }
 
-  private suspend fun bind(name: String?, vararg params: Any?) {
+  private suspend fun bind(name: String?, params: Iterable<Any?>) {
     send(Message.Bind(name?.toByteArray(Charsets.US_ASCII), params))
+    send(Message.Sync())
+    val messages = receive()
+    messages.find { it is Message.ParseComplete } ?: throw exception(messages)
+    messages.find { it is Message.ReadyForQuery } ?: throw exception(messages)
+    messages.forEach {
+      when (it) {
+        is Message.ErrorResponse -> throw RuntimeException("Error binding params:\n${it}")
+        is Message.NoticeResponse -> warn("Bind:\n${it}")
+      }
+    }
   }
 
   internal suspend fun send(message: Message.FromClient) {
