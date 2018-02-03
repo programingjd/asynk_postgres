@@ -88,14 +88,22 @@ sealed class Message {
   }
 
   class NoticeResponse(private val message: String): FromServer, Message() {
-    override fun toString() = "NoticeResponse(){\n${message}\n}"
+    override fun toString() = "NoticeResponse(){\n${message}}"
   }
 
   class ErrorResponse(private val message: String): FromServer, Message() {
-    override fun toString() = "ErrorResponse(){\n${message}\n}"
+    override fun toString() = "ErrorResponse(){\n${message}}"
   }
 
   //--------------------------------------------------------------------------------------------------
+
+  class Sync: FromClient, Message() {
+    override fun toString() = "Sync"
+    override fun writeTo(buffer: ByteBuffer) {
+      buffer.put('F'.toByte())
+      buffer.putInt(4)
+    }
+  }
 
   class PasswordMessage(val username: String, val password: String,
                         val authMessage: Authentication): FromClient, Message() {
@@ -251,7 +259,7 @@ sealed class Message {
           assert(length == 4)
           return ParseComplete()
         }
-        'N'.toByte() -> {
+        'N'.toByte(), 'E'.toByte() -> {
           val length = buffer.getInt()
           val data = ByteArray(length - 4)
           buffer.get(data)
@@ -260,22 +268,22 @@ sealed class Message {
           for (b in data) {
             if (sb.isEmpty()) {
               when (b) {
-                'S'.toByte() -> message.append("SEVERITY: ")
-                'C'.toByte() -> message.append("SQLSTATE ERROR CODE: ")
-                'M'.toByte() -> message.append("MESSAGE: ")
-                'D'.toByte() -> message.append("DETAIL: ")
-                'P'.toByte() -> message.append("POSITION: ")
-                'p'.toByte() -> message.append("INTERNAL POSITION: ")
-                'q'.toByte() -> message.append("INTERNAL QUERY: ")
-                'W'.toByte() -> message.append("WHERE: ")
-                's'.toByte() -> message.append("SCHEMA NAME: ")
-                't'.toByte() -> message.append("TABLE NAME: ")
-                'c'.toByte() -> message.append("COLUMN NAME: ")
-                'd'.toByte() -> message.append("DATA TYPE NAME: ")
-                'n'.toByte() -> message.append("CONSTRAINT NAME: ")
-                'F'.toByte() -> message.append("FILE: ")
-                'L'.toByte() -> message.append("LINE: ")
-                'R'.toByte() -> message.append("ROUTINE: ")
+                'S'.toByte() -> sb.append("SEVERITY: ")
+                'C'.toByte() -> sb.append("SQLSTATE ERROR CODE: ")
+                'M'.toByte() -> sb.append("MESSAGE: ")
+                'D'.toByte() -> sb.append("DETAIL: ")
+                'P'.toByte() -> sb.append("POSITION: ")
+                'p'.toByte() -> sb.append("INTERNAL POSITION: ")
+                'q'.toByte() -> sb.append("INTERNAL QUERY: ")
+                'W'.toByte() -> sb.append("WHERE: ")
+                's'.toByte() -> sb.append("SCHEMA NAME: ")
+                't'.toByte() -> sb.append("TABLE NAME: ")
+                'c'.toByte() -> sb.append("COLUMN NAME: ")
+                'd'.toByte() -> sb.append("DATA TYPE NAME: ")
+                'n'.toByte() -> sb.append("CONSTRAINT NAME: ")
+                'F'.toByte() -> sb.append("FILE: ")
+                'L'.toByte() -> sb.append("LINE: ")
+                'R'.toByte() -> sb.append("ROUTINE: ")
               }
             }
             else {
@@ -284,46 +292,14 @@ sealed class Message {
                 message.append('\n')
                 sb = StringBuilder()
               }
-            }
-          }
-          return NoticeResponse(message.toString())
-        }
-        'E'.toByte() -> {
-          val length = buffer.getInt()
-          val data = ByteArray(length - 4)
-          buffer.get(data)
-          val message = StringBuilder()
-          var sb = StringBuilder()
-          for (b in data) {
-            if (sb.isEmpty()) {
-              when (b) {
-                'S'.toByte() -> message.append("SEVERITY: ")
-                'C'.toByte() -> message.append("SQLSTATE ERROR CODE: ")
-                'M'.toByte() -> message.append("MESSAGE: ")
-                'D'.toByte() -> message.append("DETAIL: ")
-                'P'.toByte() -> message.append("POSITION: ")
-                'p'.toByte() -> message.append("INTERNAL POSITION: ")
-                'q'.toByte() -> message.append("INTERNAL QUERY: ")
-                'W'.toByte() -> message.append("WHERE: ")
-                's'.toByte() -> message.append("SCHEMA NAME: ")
-                't'.toByte() -> message.append("TABLE NAME: ")
-                'c'.toByte() -> message.append("COLUMN NAME: ")
-                'd'.toByte() -> message.append("DATA TYPE NAME: ")
-                'n'.toByte() -> message.append("CONSTRAINT NAME: ")
-                'F'.toByte() -> message.append("FILE: ")
-                'L'.toByte() -> message.append("LINE: ")
-                'R'.toByte() -> message.append("ROUTINE: ")
-              }
-            }
-            else {
-              if (b == 0.toByte()) {
-                message.append(sb)
-                message.append('\n')
-                sb = StringBuilder()
+              else {
+                sb.appendCodePoint(b.toInt())
               }
             }
           }
-          return ErrorResponse(message.toString())
+          return message.toString().let {
+            if (first == 'E'.toByte()) ErrorResponse(it) else NoticeResponse(it)
+          }
         }
         else -> throw IllegalArgumentException("${first.toChar()}")
       }

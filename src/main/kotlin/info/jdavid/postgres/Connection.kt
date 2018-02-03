@@ -3,6 +3,7 @@ package info.jdavid.postgres
 import kotlinx.coroutines.experimental.nio.aConnect
 import kotlinx.coroutines.experimental.nio.aRead
 import kotlinx.coroutines.experimental.nio.aWrite
+import org.slf4j.LoggerFactory
 import java.io.Closeable
 import java.net.InetAddress
 import java.net.InetSocketAddress
@@ -25,20 +26,36 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
     return props.toMap()
   }
 
-  suspend fun query(sqlStatement: String, vararg params: Any): Map<String, Any?> {
+  suspend fun query(sqlStatement: String, vararg params: Any?): Map<String, Any?> {
+    prepare(sqlStatement)
+    bind(null, params)
+    val messages = receive()
+    println(messages.size)
     return emptyMap()
   }
 
-  suspend fun query(preparedStatement: PreparedStatement, vararg params: Any): Map<String, Any?> {
+  suspend fun query(preparedStatement: PreparedStatement, vararg params: Any?): Map<String, Any?> {
     return emptyMap()
   }
 
   suspend fun prepare(sqlStatement: String): PreparedStatement {
     val name = "P${++statementCounter}"
     send(Message.Parse(name.toByteArray(Charsets.US_ASCII), sqlStatement))
-    //val messages = receive()
-    //messages.find { it is Message.ParseComplete } ?: throw exception(messages)
+    send(Message.Sync())
+    val messages = receive()
+    messages.find { it is Message.ParseComplete } ?: throw exception(messages)
+    messages.forEach {
+      when (it) {
+        is Message.ErrorResponse -> throw RuntimeException("Error parsing statement:\n${sqlStatement}\n${it}")
+        is Message.NoticeResponse -> warn("Statement:\n${sqlStatement}\n${it}")
+      }
+    }
+    messages.find { it is Message.ErrorResponse } ?: throw exception(messages)
     return PreparedStatement(name)
+  }
+
+  private suspend fun bind(name: String?, vararg params: Any?) {
+    send(Message.Bind(name?.toByteArray(Charsets.US_ASCII), params))
   }
 
   internal suspend fun send(message: Message.FromClient) {
@@ -93,6 +110,8 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
       return messages.find { it is Message.ErrorResponse }?.
         let { RuntimeException(it.toString()) } ?: RuntimeException()
     }
+    private val logger = LoggerFactory.getLogger(Connection::class.java)
+    private fun warn(message: String) = logger.warn(message)
   }
 
 }
