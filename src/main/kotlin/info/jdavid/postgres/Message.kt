@@ -2,6 +2,7 @@ package info.jdavid.postgres
 
 import java.nio.ByteBuffer
 import java.security.MessageDigest
+import java.util.Date
 
 sealed class Message {
 
@@ -122,20 +123,58 @@ sealed class Message {
     }
   }
 
-  class Parse(val name: ByteArray?, val query: String): FromClient, Message() {
-    override fun toString() = "Parse(${name ?: "unamed"}): ${query}"
+  class Parse(val preparedStatementName: ByteArray?, val query: String): FromClient, Message() {
+    override fun toString() = "Parse(${preparedStatementName ?: "unamed"}): ${query}"
     override fun writeTo(buffer: ByteBuffer) {
       buffer.put('P'.toByte())
       val start = buffer.position()
       buffer.putInt(0)
-      name?.apply { buffer.put(this) }
+      preparedStatementName?.apply { buffer.put(this) }
       buffer.put(0)
       buffer.put(query.toByteArray(Charsets.US_ASCII))
       buffer.put(0)
-      buffer.putShort(0)
+      buffer.putShort(0) // no type specified
       buffer.putInt(start, buffer.position() - start)
     }
   }
+
+  class Bind(val preparedStatementName: ByteArray?, vararg val parameters: Any?): FromClient, Message() {
+    override fun toString(): String {
+      val params = parameters.map {
+        return when (it) {
+          is Boolean -> "${it}".toUpperCase()
+          is Float -> "${it}F"
+          is Long -> "${it}L"
+          is Date -> "\"${it}\""
+          is String -> "\"${it}\""
+          else -> "${it}"
+        }
+      }
+      return "Bind(${preparedStatementName ?: "unamed"}): ${params.joinToString(", ")}"
+    }
+    override fun writeTo(buffer: ByteBuffer) {
+      buffer.put('F'.toByte())
+      val start = buffer.position()
+      buffer.putInt(0)
+      // unamed portal
+      buffer.put(0)
+      preparedStatementName?.apply { buffer.put(this) }
+      buffer.put(0)
+      buffer.putShort(0) // no input format code specified
+      buffer.putShort(parameters.size.toShort())
+      for (p in parameters) {
+        if (p == null) buffer.putInt(-1) else {
+          val bytes = TextFormat.format(p).toByteArray()
+          buffer.putInt(bytes.size)
+          buffer.put(bytes)
+        }
+      }
+      buffer.putShort(0) // no output format code specified
+      buffer.putInt(start, buffer.position() - start)
+    }
+  }
+
+  //--------------------------------------------------------------------------------------------------
 
   companion object {
     @Suppress("UsePropertyAccessSyntax")
@@ -300,7 +339,7 @@ sealed class Message {
       return "md5${hex(md5.digest())}".toByteArray()
     }
 
-    private fun hex(bytes: ByteArray): String {
+    internal fun hex(bytes: ByteArray): String {
       val chars = CharArray(bytes.size * 2)
       var i = 0
       for (b in bytes) {
