@@ -36,8 +36,15 @@ class TextFormatTests {
   @Test
   fun testMixedArray() {
     val array = arrayOf("abc", "\"quoted\"", 123, true, 1.5, null)
-    val expected = "{\"abc\",\"\\\"quoted\\\"\",\"123\",\"t\",\"1.5\",NULL}"
+    val expected = "{\"abc\",\"\\\"quoted\\\"\",123,t,1.5,NULL}"
     assertEquals(expected, TextFormat.formatArray(array))
+    assertEquals(expected, TextFormat.formatArray(array))
+  }
+
+  @Test
+  fun testNestedArrays() {
+    val array = arrayOf(arrayOf("a", "b", arrayOf("c1","c2")), arrayOf(1, arrayOf(2, 3), 4))
+    val expected = "{{\"a\",\"b\",{\"c1\",\"c2\"}},{1,{2,3},4}}"
     assertEquals(expected, TextFormat.formatArray(array))
   }
 

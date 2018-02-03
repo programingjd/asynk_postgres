@@ -28,7 +28,14 @@ internal object TextFormat {
   private val TRUE = "t"
   private val FALSE = "f"
   private val escape = { element: Any? ->
-    element?.let{ "\"${format(it).replace("\"", "\\\"")}\"" } ?: "NULL"
+    element?.let {
+      format(element).let {
+        when (element) {
+          is String -> "\"${it.replace("\"", "\\\"")}\""
+          else -> it
+        }
+      }
+    } ?: "NULL"
   }
 
   fun formatBoolean(bool: Boolean) = if (bool) TRUE else FALSE
