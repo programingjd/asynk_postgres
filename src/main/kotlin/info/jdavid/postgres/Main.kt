@@ -10,6 +10,7 @@ fun main(args: Array<String>) {
     Authentication.Credentials.PasswordCredentials(username, password).
       connectTo(database).use {
       println(it.parameters())
+      it.prepare("SELECT * FROM test")
     }
 
 //    val send = ByteBuffer.allocate(4096).order(ByteOrder.BIG_ENDIAN)

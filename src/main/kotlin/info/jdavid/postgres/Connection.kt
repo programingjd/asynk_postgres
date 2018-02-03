@@ -4,6 +4,7 @@ import kotlinx.coroutines.experimental.nio.aConnect
 import kotlinx.coroutines.experimental.nio.aRead
 import kotlinx.coroutines.experimental.nio.aWrite
 import java.io.Closeable
+import java.math.BigInteger
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.SocketAddress
@@ -17,6 +18,7 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
   private val props = mutableMapOf<String, String>()
   private var processId = 0
   private var privateKey = 0
+  private var statementCounter = 0
 
   override fun close() = channel.close()
 
@@ -24,16 +26,20 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
     return props.toMap()
   }
 
-  fun query(sqlStatement: String, vararg params: Any) {
-
+  suspend fun query(sqlStatement: String, vararg params: Any): Map<String, Any?> {
+    return emptyMap()
   }
 
-  fun query(preparedStatement: PreparedStatement, vararg params: Any) {
-
+  suspend fun query(preparedStatement: PreparedStatement, vararg params: Any): Map<String, Any?> {
+    return emptyMap()
   }
 
-  fun prepare(sqlStatement: String): PreparedStatement {
-
+  suspend fun prepare(sqlStatement: String): PreparedStatement {
+    val name = "P${++statementCounter}"
+    send(Message.Parse(name.toByteArray(Charsets.US_ASCII), sqlStatement))
+    val messages = receive()
+    messages.find { it is Message.ParseComplete } ?: throw exception(messages)
+    return PreparedStatement(name)
   }
 
   internal suspend fun send(message: Message.FromClient) {
@@ -53,7 +59,7 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
     return list
   }
 
-  class PreparedStatement private constructor(val id: String)
+  class PreparedStatement internal constructor(internal val name: String)
 
   companion object {
     suspend fun to(

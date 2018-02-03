@@ -82,6 +82,14 @@ sealed class Message {
     }
   }
 
+  class ParseComplete: FromServer, Message() {
+    override fun toString() = "ParseComplete"
+  }
+
+  class NoticeResponse(private val message: String): FromServer, Message() {
+    override fun toString() = "NoticeResponse(){\n${message}\n}"
+  }
+
   class ErrorResponse(private val message: String): FromServer, Message() {
     override fun toString() = "ErrorResponse(){\n${message}\n}"
   }
@@ -114,7 +122,20 @@ sealed class Message {
     }
   }
 
-
+  class Parse(val name: ByteArray?, val query: String): FromClient, Message() {
+    override fun toString() = "Parse(${name ?: "unamed"}): ${query}"
+    override fun writeTo(buffer: ByteBuffer) {
+      buffer.put('P'.toByte())
+      val start = buffer.position()
+      buffer.putInt(0)
+      name?.apply { buffer.put(this) }
+      buffer.put(0)
+      buffer.put(query.toByteArray(Charsets.US_ASCII))
+      buffer.put(0)
+      buffer.putShort(0)
+      buffer.putInt(start, buffer.position() - start)
+    }
+  }
 
   companion object {
     @Suppress("UsePropertyAccessSyntax")
@@ -185,6 +206,48 @@ sealed class Message {
           assert(length == 5)
           val status = ReadyForQuery.Status.from(buffer.get())
           return ReadyForQuery(status)
+        }
+        '1'.toByte() -> {
+          val length = buffer.getInt()
+          assert(length == 4)
+          return ParseComplete()
+        }
+        'N'.toByte() -> {
+          val length = buffer.getInt()
+          val data = ByteArray(length - 4)
+          buffer.get(data)
+          val message = StringBuilder()
+          var sb = StringBuilder()
+          for (b in data) {
+            if (sb.isEmpty()) {
+              when (b) {
+                'S'.toByte() -> message.append("SEVERITY: ")
+                'C'.toByte() -> message.append("SQLSTATE ERROR CODE: ")
+                'M'.toByte() -> message.append("MESSAGE: ")
+                'D'.toByte() -> message.append("DETAIL: ")
+                'P'.toByte() -> message.append("POSITION: ")
+                'p'.toByte() -> message.append("INTERNAL POSITION: ")
+                'q'.toByte() -> message.append("INTERNAL QUERY: ")
+                'W'.toByte() -> message.append("WHERE: ")
+                's'.toByte() -> message.append("SCHEMA NAME: ")
+                't'.toByte() -> message.append("TABLE NAME: ")
+                'c'.toByte() -> message.append("COLUMN NAME: ")
+                'd'.toByte() -> message.append("DATA TYPE NAME: ")
+                'n'.toByte() -> message.append("CONSTRAINT NAME: ")
+                'F'.toByte() -> message.append("FILE: ")
+                'L'.toByte() -> message.append("LINE: ")
+                'R'.toByte() -> message.append("ROUTINE: ")
+              }
+            }
+            else {
+              if (b == 0.toByte()) {
+                message.append(sb)
+                message.append('\n')
+                sb = StringBuilder()
+              }
+            }
+          }
+          return NoticeResponse(message.toString())
         }
         'E'.toByte() -> {
           val length = buffer.getInt()
