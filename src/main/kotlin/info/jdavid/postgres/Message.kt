@@ -84,15 +84,19 @@ sealed class Message {
   }
 
   class ParseComplete: FromServer, Message() {
-    override fun toString() = "ParseComplete"
+    override fun toString() = "ParseComplete()"
   }
 
   class BindComplete: FromServer, Message() {
-    override fun toString() = "BindComplete"
+    override fun toString() = "BindComplete()"
   }
 
   class NoData: FromServer, Message() {
-    override fun toString() = "NoData"
+    override fun toString() = "NoData()"
+  }
+
+  class RowDescription(fields: Map<String, String>): FromServer, Message() {
+    override fun toString() = "RowDescription()"
   }
 
   class NoticeResponse(private val message: String): FromServer, Message() {
@@ -306,6 +310,28 @@ sealed class Message {
           val length = buffer.getInt()
           assert(length == 4)
           return NoData()
+        }
+        'T'.toByte() -> {
+          val length = buffer.getInt()
+          assert(length >= 6)
+          val n = buffer.getShort()
+          val fields = (1..n).associate {
+            val sb = StringBuilder()
+            while (true) {
+              val b = buffer.get()
+              if (b == 0.toByte()) break
+              sb.appendCodePoint(b.toInt())
+            }
+            val table = buffer.getInt()
+            val index = buffer.getShort()
+            val oid = buffer.getInt()
+            val len = buffer.getShort()
+            val modifier = buffer.getInt()
+            val format = buffer.getShort()
+            assert(format == 0.toShort())
+            sb.toString() to "${oid}:${len}"
+          }
+          return RowDescription(fields)
         }
         'N'.toByte(), 'E'.toByte() -> {
           val length = buffer.getInt()
