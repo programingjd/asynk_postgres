@@ -4,7 +4,6 @@ import kotlinx.coroutines.experimental.nio.aConnect
 import kotlinx.coroutines.experimental.nio.aRead
 import kotlinx.coroutines.experimental.nio.aWrite
 import java.io.Closeable
-import java.math.BigInteger
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.SocketAddress
@@ -37,8 +36,8 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
   suspend fun prepare(sqlStatement: String): PreparedStatement {
     val name = "P${++statementCounter}"
     send(Message.Parse(name.toByteArray(Charsets.US_ASCII), sqlStatement))
-    val messages = receive()
-    messages.find { it is Message.ParseComplete } ?: throw exception(messages)
+    //val messages = receive()
+    //messages.find { it is Message.ParseComplete } ?: throw exception(messages)
     return PreparedStatement(name)
   }
 
