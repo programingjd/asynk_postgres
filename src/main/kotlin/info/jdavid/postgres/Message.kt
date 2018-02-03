@@ -91,6 +91,10 @@ sealed class Message {
     override fun toString() = "BindComplete"
   }
 
+  class NoData: FromServer, Message() {
+    override fun toString() = "NoData"
+  }
+
   class NoticeResponse(private val message: String): FromServer, Message() {
     override fun toString() = "NoticeResponse(){\n${message}}"
   }
@@ -192,6 +196,18 @@ sealed class Message {
     }
   }
 
+  class Describe: FromClient, Message() {
+    override fun toString() = "Execute"
+    override fun writeTo(buffer: ByteBuffer) {
+      buffer.put('D'.toByte())
+      val start = buffer.position()
+      buffer.putInt(0)
+      buffer.put('P'.toByte())
+      buffer.put(0) // unamed portal
+      buffer.putInt(start, buffer.position() - start)
+    }
+  }
+
   class Execute: FromClient, Message() {
     override fun toString() = "Execute"
     override fun writeTo(buffer: ByteBuffer) {
@@ -285,6 +301,11 @@ sealed class Message {
           val length = buffer.getInt()
           assert(length == 4)
           return BindComplete()
+        }
+        'n'.toByte() -> {
+          val length = buffer.getInt()
+          assert(length == 4)
+          return NoData()
         }
         'N'.toByte(), 'E'.toByte() -> {
           val length = buffer.getInt()

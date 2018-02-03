@@ -34,6 +34,7 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
   suspend fun query(preparedStatement: PreparedStatement,
                     params: Iterable<Any?> = emptyList()): Map<String, Any?> {
     bind(preparedStatement.name, params)
+    describe()
     val messages = execute()
     return emptyMap()
   }
@@ -66,6 +67,11 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
         is Message.NoticeResponse -> warn("Bind:\n${it}")
       }
     }
+  }
+
+  private suspend fun describe() {
+    send(Message.Describe())
+    val messages = receive()
   }
 
   private suspend fun execute(): List<Message.FromServer> {
