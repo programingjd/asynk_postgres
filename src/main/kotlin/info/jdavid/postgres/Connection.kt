@@ -130,7 +130,8 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
   }
 
   private suspend fun prepare(sqlStatement: String, name: ByteArray?): PreparedStatement {
-    send(Message.Parse(name, sqlStatement))
+    val preparedStatement = PreparedStatement(name, sqlStatement)
+    send(Message.Parse(name, preparedStatement.query))
     if (name != null) {
       send(Message.Flush())
       val messages = receive()
@@ -143,7 +144,7 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
       messages.find { it is Message.ParseComplete } ?:
         throw RuntimeException("Failed to parse statement:\n${sqlStatement}")
     }
-    return PreparedStatement(name, sqlStatement)
+    return preparedStatement
   }
 
   private suspend fun bind(preparedStatementName: ByteArray?,

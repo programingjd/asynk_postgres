@@ -17,7 +17,8 @@ fun main(args: Array<String>) {
       val prepared = it.prepare("SELECT * FROM test")
       it.close(prepared)
       println(json(it.query("SELECT * FROM test")))
-      println(it.update("INSERT INTO test (name) VALUES (?)", listOf("Name1")))
+      println(it.update("INSERT INTO test (name) VALUES (?);", listOf("Name2")))
     }
   }
 }
+
