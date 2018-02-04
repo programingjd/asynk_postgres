@@ -95,8 +95,16 @@ sealed class Message {
     override fun toString() = "NoData()"
   }
 
-  class RowDescription(fields: Map<String, String>): FromServer, Message() {
+  class RowDescription(internal val fields: Map<String, String>): FromServer, Message() {
     override fun toString() = "RowDescription()"
+  }
+
+  class CloseComplete: FromServer, Message() {
+    override fun toString() = "CloseComplete()"
+  }
+
+  class CommandComplete(internal val tag: String): FromServer, Message() {
+    override fun toString() = "CommandComplete(${tag})"
   }
 
   class NoticeResponse(private val message: String): FromServer, Message() {
@@ -108,14 +116,6 @@ sealed class Message {
   }
 
   //--------------------------------------------------------------------------------------------------
-
-  class Sync: FromClient, Message() {
-    override fun toString() = "Sync"
-    override fun writeTo(buffer: ByteBuffer) {
-      buffer.put('S'.toByte())
-      buffer.putInt(4)
-    }
-  }
 
   class PasswordMessage(val username: String, val password: String,
                         val authMessage: Authentication): FromClient, Message() {
@@ -145,7 +145,7 @@ sealed class Message {
 
   class Parse(private val preparedStatementName: ByteArray?,
               private val query: String): FromClient, Message() {
-    override fun toString() = "Parse(${preparedStatementName ?: "unamed"}): ${query}"
+    override fun toString() = "Parse(${preparedStatementName?.let { String(it) } ?: "unamed"}): ${query}"
     override fun writeTo(buffer: ByteBuffer) {
       buffer.put('P'.toByte())
       val start = buffer.position()
@@ -160,6 +160,7 @@ sealed class Message {
   }
 
   class Bind(private val preparedStatementName: ByteArray?,
+             private val portalName: ByteArray?,
              private val parameters: Iterable<Any?>): FromClient, Message() {
     override fun toString(): String {
       val params = parameters.map {
@@ -172,13 +173,15 @@ sealed class Message {
           else -> "${it}"
         }
       }
-      return "Bind(${preparedStatementName ?: "unamed"}): ${params.joinToString(", ")}"
+      val name1 = preparedStatementName?.let { String(it) } ?: "unamed"
+      val name2 = portalName?.let { String(it) } ?: "unamed"
+      return "Bind(${name1},${name2}): ${params.joinToString(", ")}"
     }
     override fun writeTo(buffer: ByteBuffer) {
       buffer.put('B'.toByte())
       val start = buffer.position()
       buffer.putInt(0)
-      // unamed portal
+      portalName?.apply { buffer.put(this) }
       buffer.put(0)
       preparedStatementName?.apply { buffer.put(this) }
       buffer.put(0)
@@ -200,27 +203,71 @@ sealed class Message {
     }
   }
 
-  class Describe: FromClient, Message() {
-    override fun toString() = "Execute"
+  class Describe(private val portalName: ByteArray?): FromClient, Message() {
+    override fun toString() = "Describe(${portalName?.let { String(it) } ?: "unamed"})"
     override fun writeTo(buffer: ByteBuffer) {
       buffer.put('D'.toByte())
       val start = buffer.position()
       buffer.putInt(0)
       buffer.put('P'.toByte())
-      buffer.put(0) // unamed portal
+      portalName?.apply { buffer.put(this) }
+      buffer.put(0)
       buffer.putInt(start, buffer.position() - start)
     }
   }
 
-  class Execute: FromClient, Message() {
-    override fun toString() = "Execute"
+  class Execute(private val portalName: ByteArray?): FromClient, Message() {
+    override fun toString() = "Execute(${portalName?.let { String(it) } ?: "unamed"})"
     override fun writeTo(buffer: ByteBuffer) {
       buffer.put('E'.toByte())
       val start = buffer.position()
       buffer.putInt(0)
-      buffer.put(0) // unamed portal
+      portalName?.apply { buffer.put(this) }
+      buffer.put(0)
       buffer.putInt(0) // no lmit on number of rows
       buffer.putInt(start, buffer.position() - start)
+    }
+  }
+
+  class ClosePreparedStatement(private val name: ByteArray?): FromClient, Message() {
+    override fun toString() = "ClosePreparedStatement(${name?.let { String(it) } ?: "unamed"})"
+    override fun writeTo(buffer: ByteBuffer) {
+      buffer.put('C'.toByte())
+      val start = buffer.position()
+      buffer.putInt(0)
+      buffer.put('S'.toByte())
+      name?.apply { buffer.put(this) }
+      buffer.put(0)
+      buffer.putInt(start, buffer.position() - start)
+    }
+  }
+
+  class ClosePortal(private val name: ByteArray?): FromClient, Message() {
+    override fun toString() = "ClosePortal(${name?.let { String(it) } ?: "unamed"})"
+    override fun writeTo(buffer: ByteBuffer) {
+      buffer.put('C'.toByte())
+      val start = buffer.position()
+      buffer.putInt(0)
+      buffer.put('P'.toByte())
+      name?.apply { buffer.put(this) }
+      buffer.put(0)
+      buffer.putInt(start, buffer.position() - start)
+    }
+  }
+
+  class Flush: FromClient, Message() {
+    override fun toString() = "Flush"
+    override fun writeTo(buffer: ByteBuffer) {
+      buffer.put('H'.toByte())
+      buffer.putInt(4)
+    }
+  }
+
+  class Sync: FromClient, Message() {
+    override fun toString() = "Sync"
+    override fun writeTo(buffer: ByteBuffer) {
+      buffer.put('S'.toByte())
+      buffer.putInt(4)
     }
   }
 
@@ -306,6 +353,11 @@ sealed class Message {
           assert(length == 4)
           return BindComplete()
         }
+        '3'.toByte() -> {
+          val length = buffer.getInt()
+          assert(length == 4)
+          return CloseComplete()
+        }
         'n'.toByte() -> {
           val length = buffer.getInt()
           assert(length == 4)
@@ -332,6 +384,15 @@ sealed class Message {
             sb.toString() to "${oid}:${len}"
           }
           return RowDescription(fields)
+        }
+        'C'.toByte() -> {
+          val length = buffer.getInt()
+          val data = ByteArray(length - 5)
+          buffer.get(data)
+          val tag = String(data, Charsets.US_ASCII)
+          val end = buffer.get()
+          assert(end == 0.toByte())
+          return CommandComplete(tag)
         }
         'N'.toByte(), 'E'.toByte() -> {
           val length = buffer.getInt()

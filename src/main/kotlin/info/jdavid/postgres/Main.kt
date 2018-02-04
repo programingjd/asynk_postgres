@@ -10,6 +10,8 @@ fun main(args: Array<String>) {
     Authentication.Credentials.PasswordCredentials(username, password).
       connectTo(database).use {
       println(it.parameters())
+      val prepared = it.prepare("SELECT * FROM test")
+      it.close(prepared)
       it.query("SELECT * FROM test")
     }
 

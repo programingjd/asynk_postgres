@@ -27,63 +27,100 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
   }
 
   suspend fun query(sqlStatement: String, params: Iterable<Any?> = emptyList()): Map<String, Any?> {
-    val statement = prepare(sqlStatement)
+    val statement = prepare(sqlStatement, null)
     return query(statement, params)
   }
 
   suspend fun query(preparedStatement: PreparedStatement,
                     params: Iterable<Any?> = emptyList()): Map<String, Any?> {
-    bind(preparedStatement.name, params)
-    describe()
-    val messages = execute()
+    val portalName: ByteArray? = null
+    val unamed = preparedStatement.name == null
+    bind(preparedStatement.name, portalName, params)
+    describe(portalName)
+    execute(portalName)
+    if (unamed) close(preparedStatement) else close(portalName)
+    sync()
+    val messages = receive()
+    messages.forEach {
+      when (it) {
+        is Message.ErrorResponse -> err(it.toString())
+        is Message.NoticeResponse -> warn(it.toString())
+      }
+    }
+    if (unamed) {
+      messages.find { it is Message.ParseComplete } ?: throw RuntimeException(
+        "Failed to parse statement:\n${preparedStatement.query}")
+    }
+    messages.find { it is Message.BindComplete } ?: throw RuntimeException(
+      "Failed to bind parameters to statement:\n${preparedStatement.query}\n${params.joinToString(", ")}"
+    )
+    val fields =
+      messages.find { it is Message.NoData || it is Message.RowDescription }?.
+        let { if (it is Message.RowDescription) it.fields else emptyMap() } ?:
+        throw RuntimeException()
+
+    messages.find { it is Message.CommandComplete } ?: throw RuntimeException()
+    messages.find { it is Message.CloseComplete } ?: throw RuntimeException()
+    messages.find { it is Message.ReadyForQuery } ?: throw RuntimeException()
     return emptyMap()
   }
 
-  suspend fun prepare(sqlStatement: String): PreparedStatement {
-    val name = "P${++statementCounter}"
-    send(Message.Parse(name.toByteArray(Charsets.US_ASCII), sqlStatement))
+  suspend fun close(preparedStatement: PreparedStatement) {
+    send(Message.ClosePreparedStatement(preparedStatement.name))
+    if (preparedStatement.name != null) {
+      send(Message.Flush())
+      val messages = receive()
+      messages.forEach {
+        when (it) {
+          is Message.ErrorResponse -> err(it.toString())
+          is Message.NoticeResponse -> warn(it.toString())
+        }
+      }
+      messages.find { it is Message.CloseComplete } ?: throw RuntimeException()
+    }
+  }
+
+  suspend fun prepare(sqlStatement: String, name: String = "__ps_${++statementCounter}"): PreparedStatement {
+    return prepare(sqlStatement, name.toByteArray(Charsets.US_ASCII))
+  }
+
+  private suspend fun prepare(sqlStatement: String, name: ByteArray?): PreparedStatement {
+    send(Message.Parse(name, sqlStatement))
+    if (name != null) {
+      send(Message.Flush())
+      val messages = receive()
+      messages.forEach {
+        when (it) {
+          is Message.ErrorResponse -> err(it.toString())
+          is Message.NoticeResponse -> warn(it.toString())
+        }
+      }
+      messages.find { it is Message.ParseComplete } ?:
+        throw RuntimeException("Failed to parse statement:\n${sqlStatement}")
+    }
+    return PreparedStatement(name, sqlStatement)
+  }
+
+  private suspend fun bind(preparedStatementName: ByteArray?,
+                           portalName: ByteArray?,
+                           params: Iterable<Any?>) {
+    send(Message.Bind(preparedStatementName, portalName, params))
+  }
+
+  private suspend fun describe(portalName: ByteArray?) {
+    send(Message.Describe(portalName))
+  }
+
+  private suspend fun execute(portalName: ByteArray?) {
+    send(Message.Execute(portalName))
+  }
+
+  private suspend fun close(portalName: ByteArray?) {
+    send(Message.ClosePortal(portalName))
+  }
+
+  private suspend fun sync() {
     send(Message.Sync())
-    val messages = receive()
-    messages.find { it is Message.ParseComplete } ?: throw exception(messages)
-    messages.find { it is Message.ReadyForQuery } ?: throw exception(messages)
-    messages.forEach {
-      when (it) {
-        is Message.ErrorResponse -> throw RuntimeException("Error parsing statement:\n${sqlStatement}\n${it}")
-        is Message.NoticeResponse -> warn("Statement:\n${sqlStatement}\n${it}")
-      }
-    }
-    return PreparedStatement(name)
-  }
-
-  private suspend fun bind(name: String?, params: Iterable<Any?>) {
-    send(Message.Bind(name?.toByteArray(Charsets.US_ASCII), params))
-    send(Message.Sync())
-    val messages = receive()
-    messages.find { it is Message.BindComplete } ?: throw exception(messages)
-    messages.find { it is Message.ReadyForQuery } ?: throw exception(messages)
-    messages.forEach {
-      when (it) {
-        is Message.ErrorResponse -> throw RuntimeException("Error binding params:\n${it}")
-        is Message.NoticeResponse -> warn("Bind:\n${it}")
-      }
-    }
-  }
-
-  private suspend fun describe() {
-    send(Message.Describe())
-    val messages = receive()
-  }
-
-  private suspend fun execute(): List<Message.FromServer> {
-    send(Message.Execute())
-    val messages = receive()
-    messages.forEach {
-      when (it) {
-        is Message.ErrorResponse -> throw RuntimeException("Error executing statement:\n${it}")
-        is Message.NoticeResponse -> warn("Execute:\n${it}")
-      }
-    }
-    return messages
   }
 
   internal suspend fun send(message: Message.FromClient) {
@@ -103,7 +140,7 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
     return list
   }
 
-  class PreparedStatement internal constructor(internal val name: String)
+  class PreparedStatement internal constructor(internal val name: ByteArray?, internal val query: String)
 
   companion object {
     suspend fun to(
@@ -118,9 +155,15 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
         val connection = Connection(channel, buffer)
         connection.send(Message.StartupMessage(credentials.username, database))
         val messages = Authentication.authenticate(connection, credentials)
-        messages.find { it is Message.ReadyForQuery } ?: throw exception(messages)
+        messages.forEach {
+          when (it) {
+            is Message.ErrorResponse -> err(it.toString())
+            is Message.NoticeResponse -> warn(it.toString())
+          }
+        }
+        messages.find { it is Message.ReadyForQuery } ?: throw RuntimeException()
         val (processId, privateKey) =
-          (messages.find { it is Message.BackendKeyData } ?: throw exception(messages))
+          (messages.find { it is Message.BackendKeyData } ?: throw RuntimeException())
             as Message.BackendKeyData
         connection.processId = processId
         connection.privateKey = privateKey
@@ -134,12 +177,9 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
         throw e
       }
     }
-    private fun exception(messages: List<Message.FromServer>): Exception {
-      return messages.find { it is Message.ErrorResponse }?.
-        let { RuntimeException(it.toString()) } ?: RuntimeException()
-    }
     private val logger = LoggerFactory.getLogger(Connection::class.java)
     private fun warn(message: String) = logger.warn(message)
+    private fun err(message: String) = logger.error(message)
   }
 
 }
