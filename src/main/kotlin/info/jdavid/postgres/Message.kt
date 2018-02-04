@@ -95,8 +95,12 @@ sealed class Message {
     override fun toString() = "NoData()"
   }
 
-  class RowDescription(internal val fields: Map<String, String>): FromServer, Message() {
+  class RowDescription(internal val fields: List<Pair<String, String>>): FromServer, Message() {
     override fun toString() = "RowDescription()"
+  }
+
+  class PortalSuspended: FromServer, Message() {
+    override fun toString() = "PortalSuspended()"
   }
 
   class CloseComplete: FromServer, Message() {
@@ -105,6 +109,10 @@ sealed class Message {
 
   class CommandComplete(internal val tag: String): FromServer, Message() {
     override fun toString() = "CommandComplete(${tag})"
+  }
+
+  class DataRow(internal val values: List<String?>): FromServer, Message() {
+    override fun toString() = "DataRow(${values.joinToString { ", " }})"
   }
 
   class NoticeResponse(private val message: String): FromServer, Message() {
@@ -216,7 +224,7 @@ sealed class Message {
     }
   }
 
-  class Execute(private val portalName: ByteArray?): FromClient, Message() {
+  class Execute(private val portalName: ByteArray?, private val maxRows: Int): FromClient, Message() {
     override fun toString() = "Execute(${portalName?.let { String(it) } ?: "unamed"})"
     override fun writeTo(buffer: ByteBuffer) {
       buffer.put('E'.toByte())
@@ -224,7 +232,7 @@ sealed class Message {
       buffer.putInt(0)
       portalName?.apply { buffer.put(this) }
       buffer.put(0)
-      buffer.putInt(0) // no lmit on number of rows
+      buffer.putInt(maxRows)
       buffer.putInt(start, buffer.position() - start)
     }
   }
@@ -363,11 +371,16 @@ sealed class Message {
           assert(length == 4)
           return NoData()
         }
+        's'.toByte() -> {
+          val length = buffer.getInt()
+          assert(length == 4)
+          return PortalSuspended()
+        }
         'T'.toByte() -> {
           val length = buffer.getInt()
           assert(length >= 6)
           val n = buffer.getShort()
-          val fields = (1..n).associate {
+          val fields = (1..n).map {
             val sb = StringBuilder()
             while (true) {
               val b = buffer.get()
@@ -393,6 +406,23 @@ sealed class Message {
           val end = buffer.get()
           assert(end == 0.toByte())
           return CommandComplete(tag)
+        }
+        'D'.toByte() -> {
+          val length = buffer.getInt()
+          val n = buffer.getShort()
+          val data = ByteArray(length - 6 - n * 4)
+          val list = ArrayList<String?>(n.toInt())
+          for (i in 1..n) {
+            val len = buffer.getInt()
+            if (len == -1) {
+              list.add(null)
+            }
+            else {
+              buffer.get(data, 0, len)
+              list.add(String(data, 0, len))
+            }
+          }
+          return DataRow(list)
         }
         'N'.toByte(), 'E'.toByte() -> {
           val length = buffer.getInt()

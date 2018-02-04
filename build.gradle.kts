@@ -29,6 +29,7 @@ dependencies {
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-nio:0.22.1")
   implementation("org.slf4j:slf4j-api:1.7.25")
   testImplementation("junit:junit:4.12")
+  testImplementation("com.fasterxml.jackson.core:jackson-databind:2.9.4")
   testRuntime("org.slf4j:slf4j-jdk14:1.7.25")
 }
 

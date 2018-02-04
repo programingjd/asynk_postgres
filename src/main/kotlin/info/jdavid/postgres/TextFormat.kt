@@ -7,6 +7,18 @@ import java.util.Date
 
 internal object TextFormat {
 
+  fun parse(type: String, value: String): Any {
+    return when (type) {
+      "21:2" -> parseShort(value)
+      "23:4" -> parseInt(value)
+      "20:8" -> parseLong(value)
+      "700:4" -> parseFloat(value)
+      "701:8" -> parseDouble(value)
+      "16:1" -> parseBoolean(value)
+      else -> value
+    }
+  }
+
   fun format(value: Any): String {
     return when (value) {
       is Boolean -> formatBoolean(value)
@@ -66,6 +78,16 @@ internal object TextFormat {
 
   fun formatArray(array: DoubleArray) = array.map(escape).joinToString(",", "{", "}")
 
+  fun parseShort(value: String) = value.toShort()
 
+  fun parseInt(value: String) = value.toInt()
+
+  fun parseLong(value: String) = value.toLong()
+
+  fun parseFloat(value: String) = value.toFloat()
+
+  fun parseDouble(value: String) = value.toDouble()
+
+  fun parseBoolean(value: String) = value == TRUE
 
 }

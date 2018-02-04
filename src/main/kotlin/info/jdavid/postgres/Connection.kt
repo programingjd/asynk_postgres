@@ -10,7 +10,7 @@ import java.net.InetSocketAddress
 import java.net.SocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousSocketChannel
-import java.util.*
+import java.util.LinkedList
 import java.util.concurrent.TimeUnit
 
 class Connection internal constructor(private val channel: AsynchronousSocketChannel,
@@ -26,18 +26,49 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
     return props.toMap()
   }
 
-  suspend fun query(sqlStatement: String, params: Iterable<Any?> = emptyList()): Map<String, Any?> {
+  suspend fun update(sqlStatement: String, params: Iterable<Any?> = emptyList()): Int {
+    val statement = prepare(sqlStatement, null)
+    return update(statement, params)
+  }
+
+  suspend fun update(preparedStatement: PreparedStatement,
+                     params: Iterable<Any?> = emptyList()): Int {
+    val (_, messages) = execute(preparedStatement, params)
+    val tag =
+      (
+        (messages.find { it is Message.CommandComplete } ?: throw RuntimeException())
+          as Message.CommandComplete
+      ).tag
+    val i = tag.lastIndexOf(' ').apply { if (this == -1) throw RuntimeException() }
+    return tag.substring(i+1).toInt()
+  }
+
+  suspend fun query(sqlStatement: String, params: Iterable<Any?> = emptyList()): List<Map<String, Any?>> {
     val statement = prepare(sqlStatement, null)
     return query(statement, params)
   }
 
   suspend fun query(preparedStatement: PreparedStatement,
-                    params: Iterable<Any?> = emptyList()): Map<String, Any?> {
+                    params: Iterable<Any?> = emptyList()): List<Map<String, Any?>> {
+    val (fields, messages) = execute(preparedStatement, params)
+    val results = mutableListOf<Map<String, Any?>>()
+    appendResults(fields, results, messages).apply {
+      find { it is Message.CommandComplete } ?: throw RuntimeException()
+      find { it is Message.CloseComplete } ?: throw RuntimeException()
+      find { it is Message.ReadyForQuery } ?: throw RuntimeException()
+    }
+    return results
+  }
+
+  private suspend fun execute(preparedStatement: PreparedStatement,
+                              params: Iterable<Any?>): Pair<List<Pair<String, String>>,
+                                                            List<Message.FromServer>> {
+    val batchSize = 100
     val portalName: ByteArray? = null
     val unamed = preparedStatement.name == null
     bind(preparedStatement.name, portalName, params)
     describe(portalName)
-    execute(portalName)
+    execute(portalName, batchSize)
     if (unamed) close(preparedStatement) else close(portalName)
     sync()
     val messages = receive()
@@ -56,13 +87,27 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
     )
     val fields =
       messages.find { it is Message.NoData || it is Message.RowDescription }?.
-        let { if (it is Message.RowDescription) it.fields else emptyMap() } ?:
+        let { if (it is Message.RowDescription) it.fields else emptyList() } ?:
         throw RuntimeException()
+    return fields to messages
+  }
 
-    messages.find { it is Message.CommandComplete } ?: throw RuntimeException()
-    messages.find { it is Message.CloseComplete } ?: throw RuntimeException()
-    messages.find { it is Message.ReadyForQuery } ?: throw RuntimeException()
-    return emptyMap()
+  private fun appendResults(fields: List<Pair<String, String>>,
+                            results: MutableList<Map<String, Any?>>,
+                            messages: List<Message.FromServer>): List<Message.FromServer> {
+    val n = fields.size
+    messages.filterIsInstance<Message.DataRow>().forEach {
+      val values = it.values
+      assert(n == values.size)
+      val map = LinkedHashMap<String, Any?>(n)
+      for (i in 0 until n) {
+        val field = fields[i]
+        val result = values[i]
+        map[field.first] = if (result == null) null else TextFormat.parse(field.second, result)
+      }
+      results.add(map)
+    }
+    return messages
   }
 
   suspend fun close(preparedStatement: PreparedStatement) {
@@ -111,8 +156,8 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
     send(Message.Describe(portalName))
   }
 
-  private suspend fun execute(portalName: ByteArray?) {
-    send(Message.Execute(portalName))
+  private suspend fun execute(portalName: ByteArray?, maxRows: Int) {
+    send(Message.Execute(portalName, maxRows))
   }
 
   private suspend fun close(portalName: ByteArray?) {
@@ -140,7 +185,25 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
     return list
   }
 
-  class PreparedStatement internal constructor(internal val name: ByteArray?, internal val query: String)
+  class PreparedStatement internal constructor(internal val name: ByteArray?, query: String) {
+    internal val query: String
+    init {
+      val sb = StringBuilder(query.length + 16)
+      var start = 0
+      var i = 0
+      while (true) {
+        val index = query.indexOf('?', start)
+        if (index == -1) {
+          sb.append(query.substring(start))
+          break
+        }
+        sb.append(query.substring(start, index))
+        sb.append("\$${++i}")
+        start = index + 1
+      }
+      this.query = sb.toString()
+    }
+  }
 
   companion object {
     suspend fun to(
