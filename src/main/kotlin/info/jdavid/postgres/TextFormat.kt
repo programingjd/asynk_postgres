@@ -7,15 +7,25 @@ import java.util.Date
 
 internal object TextFormat {
 
-  fun parse(type: String, value: String): Any {
+  fun parse(typeDescription: String, value: String): Any {
+    val index = typeDescription.indexOf(':')
+    val oid = (if (index == -1) typeDescription else typeDescription.substring(0, index)).toInt()
+    val type = Oids.fromOid(oid)
     return when (type) {
-      "21:2" -> parseShort(value)
-      "23:4" -> parseInt(value)
-      "20:8" -> parseLong(value)
-      "700:4" -> parseFloat(value)
-      "701:8" -> parseDouble(value)
-      "16:1" -> parseBoolean(value)
-      else -> value
+      Oids.Void -> throw RuntimeException()
+      Oids.Boolean -> parseBoolean(value)
+      Oids.Short -> parseShort(value)
+      Oids.Int -> parseInt(value)
+      Oids.Long -> parseLong(value)
+      Oids.Float -> parseFloat(value)
+      Oids.Double -> parseDouble(value)
+      Oids.BigDecimal -> parseBigDecimal(value)
+      Oids.Char -> value.apply { assert(length == 1) }[0]
+      Oids.Date -> parseDate(value)
+      Oids.Timestamp -> parseTimestamp(value)
+      Oids.TimestampZ -> parseTimestampZ(value)
+      Oids.Name, Oids.Text, Oids.VarChar, Oids.BpChar -> value
+      Oids.XML, Oids.Json, Oids.UUID -> value
     }
   }
 
@@ -88,6 +98,24 @@ internal object TextFormat {
 
   fun parseDouble(value: String) = value.toDouble()
 
+  fun parseBigDecimal(value: String) = value.toBigDecimal()
+
   fun parseBoolean(value: String) = value == TRUE
+
+  fun parseDate(value: String) {
+    TODO()
+  }
+
+  fun parseTimestamp(value: String) {
+    TODO()
+  }
+
+  fun parseTimestampZ(value: String) {
+    TODO()
+  }
+
+  fun <T: Oids> parseArray(value: String, type: T): List<Any> {
+    TODO()
+  }
 
 }
