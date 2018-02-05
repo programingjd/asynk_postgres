@@ -36,13 +36,14 @@ object Authentication {
   sealed class Credentials(internal val username: String) {
 
     class UnsecuredCredentials(username: String = "postgres"): Credentials(username)
-    class PasswordCredentials(username: String, internal val password: String): Credentials(username)
+    class PasswordCredentials(username: String = "postgres",
+                              internal val password: String = "postgres"): Credentials(username)
 
     suspend fun connectTo(
       database: String,
       address: SocketAddress = InetSocketAddress(InetAddress.getLoopbackAddress (), 5432)
     ): Connection {
-      return Connection.to(database, address,this)
+      return Connection.to(database, this, address)
     }
 
   }

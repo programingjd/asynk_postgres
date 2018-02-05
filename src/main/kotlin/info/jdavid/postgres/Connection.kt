@@ -39,8 +39,16 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
         (messages.find { it is Message.CommandComplete } ?: throw RuntimeException())
           as Message.CommandComplete
       ).tag
-    val i = tag.lastIndexOf(' ').apply { if (this == -1) throw RuntimeException() }
-    return tag.substring(i+1).toInt()
+    val i = tag.indexOf(' ').apply { if (this == -1) throw RuntimeException() }
+    val command = tag.substring(0, i)
+    return when (command) {
+      "INSERT" -> {
+        val j = tag.indexOf(' ', i + 1).apply { if (this == -1) throw RuntimeException() }
+        tag.substring(j + 1).toInt()
+      }
+      "DELETE", "UPDATE", "SELECT", "MOVE", "FETCH", "COPY" -> tag.substring(i + 1).toInt()
+      else -> 0
+    }
   }
 
   suspend fun query(sqlStatement: String, params: Iterable<Any?> = emptyList()): List<Map<String, Any?>> {
@@ -209,8 +217,8 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
   companion object {
     suspend fun to(
       database: String,
-      address: SocketAddress = InetSocketAddress(InetAddress.getLoopbackAddress(), 5432),
-      credentials: Authentication.Credentials = Authentication.Credentials.UnsecuredCredentials()
+      credentials: Authentication.Credentials = Authentication.Credentials.UnsecuredCredentials(),
+      address: SocketAddress = InetSocketAddress(InetAddress.getLoopbackAddress(), 5432)
     ): Connection {
       val channel = AsynchronousSocketChannel.open()
       try {

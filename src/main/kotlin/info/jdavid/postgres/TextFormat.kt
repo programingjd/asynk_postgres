@@ -1,5 +1,6 @@
 package info.jdavid.postgres
 
+import java.math.BigInteger
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
@@ -25,7 +26,17 @@ internal object TextFormat {
       Oids.Timestamp -> parseTimestamp(value)
       Oids.TimestampZ -> parseTimestampZ(value)
       Oids.Name, Oids.Text, Oids.VarChar, Oids.BpChar -> value
+      Oids.ByteArray -> parseByteArray(value)
       Oids.XML, Oids.Json, Oids.UUID -> value
+      Oids.Oid -> parseShort(value)
+      Oids.Bit, Oids.VarBit -> parseBitset(value)
+      Oids.Point -> parsePoint(value)
+      Oids.BooleanArray, Oids.ShortArray, Oids.IntArray, Oids.LongArray, Oids.FloatArray, Oids.DoubleArray,
+      Oids.BigDecimalArray, Oids.OidArray, Oids.CharArray,
+      Oids.DateArray,  Oids.TimestampArray, Oids.TimestampZArray,
+      Oids.NameArray, Oids.TextArray, Oids.VarCharArray, Oids.BpCharArray,
+      Oids.OidArray, Oids.BitArray, Oids.VarBitArray, Oids.ByteArrayArray,
+      Oids.UUIDArray, Oids.XMLArray  -> parseArray(value, type)
     }
   }
 
@@ -102,15 +113,27 @@ internal object TextFormat {
 
   fun parseBoolean(value: String) = value == TRUE
 
-  fun parseDate(value: String) {
+  fun parseDate(value: String): Date {
     TODO()
   }
 
-  fun parseTimestamp(value: String) {
+  fun parseTimestamp(value: String): Date {
     TODO()
   }
 
-  fun parseTimestampZ(value: String) {
+  fun parseTimestampZ(value: String): Date {
+    TODO()
+  }
+
+  fun parseBitset(value: String): BigInteger {
+    TODO()
+  }
+
+  fun parseByteArray(value: String): ByteArray {
+    TODO()
+  }
+
+  fun parsePoint(value: String): Pair<Double, Double> {
     TODO()
   }
 
