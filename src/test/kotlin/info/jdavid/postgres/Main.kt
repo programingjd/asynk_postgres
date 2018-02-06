@@ -18,6 +18,9 @@ fun main(args: Array<String>) {
       it.close(prepared)
       println(json(it.query("SELECT * FROM test")))
       println(it.update("INSERT INTO test (name) VALUES (?);", listOf("Name2")))
+      for (i in 1..500) {
+        println(it.update("INSERT INTO test (name) VALUES (?);", listOf("Name${i+502}")))
+      }
     }
   }
 }

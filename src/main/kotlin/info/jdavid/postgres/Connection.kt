@@ -12,6 +12,7 @@ import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousSocketChannel
 import java.util.LinkedList
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.experimental.buildSequence
 
 class Connection internal constructor(private val channel: AsynchronousSocketChannel,
                                       private val buffer: ByteBuffer): Closeable {
@@ -60,6 +61,9 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
                     params: Iterable<Any?> = emptyList()): List<Map<String, Any?>> {
     val (fields, messages) = execute(preparedStatement, params)
     val results = mutableListOf<Map<String, Any?>>()
+//    return buildSequence {
+//
+//    }
     appendResults(fields, results, messages).apply {
       find { it is Message.CommandComplete } ?: throw RuntimeException()
       find { it is Message.CloseComplete } ?: throw RuntimeException()

@@ -127,6 +127,11 @@ internal object TextFormat {
       append(ISO_LOCAL_DATE).
       optionalStart().
       appendLiteral('T').
+      optionalEnd().
+      optionalStart().
+      appendLiteral(' ').
+      optionalEnd().
+      optionalStart().
       append(ISO_LOCAL_TIME).
       optionalStart().
       appendOffsetId().
@@ -149,13 +154,9 @@ internal object TextFormat {
     })
   }
 
-  fun parseTimestamp(value: String): Date {
-    TODO()
-  }
+  fun parseTimestamp(value: String) = parseDate(value)
 
-  fun parseTimestampZ(value: String): Date {
-    TODO()
-  }
+  fun parseTimestampZ(value: String) = parseDate(value)
 
   fun parseBitset(value: String): BigInteger {
     TODO()

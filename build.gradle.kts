@@ -84,7 +84,7 @@ bintray {
       }?.substring(key.length + 1)
     }
   }()
-  dryRun = true
+  //dryRun = true
   publish = true
   setPublications("mavenJava")
   pkg(delegateClosureOf<BintrayExtension.PackageConfig>{
