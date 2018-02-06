@@ -6,7 +6,7 @@ import org.junit.Assert.*
 import java.security.MessageDigest
 import java.util.*
 
-class TextFormatTests {
+class TextTests {
 
   @Test
   fun testBoolean() {

@@ -2,9 +2,18 @@ package info.jdavid.postgres
 
 import java.math.BigInteger
 import java.time.Instant
+import java.time.OffsetDateTime
+import java.time.LocalDateTime
+import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeFormatter.ISO_LOCAL_DATE
+import java.time.format.DateTimeFormatter.ISO_LOCAL_TIME
+import java.time.format.DateTimeFormatterBuilder
+import java.time.temporal.TemporalQuery
 import java.util.Date
+import java.util.Locale
 
 internal object TextFormat {
 
@@ -35,7 +44,7 @@ internal object TextFormat {
       Oids.BigDecimalArray, Oids.OidArray, Oids.CharArray,
       Oids.DateArray,  Oids.TimestampArray, Oids.TimestampZArray,
       Oids.NameArray, Oids.TextArray, Oids.VarCharArray, Oids.BpCharArray,
-      Oids.OidArray, Oids.BitArray, Oids.VarBitArray, Oids.ByteArrayArray,
+      Oids.BitArray, Oids.VarBitArray, Oids.ByteArrayArray,
       Oids.UUIDArray, Oids.XMLArray  -> parseArray(value, type)
     }
   }
@@ -114,7 +123,30 @@ internal object TextFormat {
   fun parseBoolean(value: String) = value == TRUE
 
   fun parseDate(value: String): Date {
-    TODO()
+    val temporal = DateTimeFormatterBuilder().
+      append(ISO_LOCAL_DATE).
+      optionalStart().
+      appendLiteral('T').
+      append(ISO_LOCAL_TIME).
+      optionalStart().
+      appendOffsetId().
+      optionalStart().
+      appendLiteral('[').
+      parseCaseSensitive().
+      appendZoneRegionId().
+      appendLiteral(']').
+      toFormatter(Locale.US).parseBest(
+        value,
+        TemporalQuery<OffsetDateTime> { a -> OffsetDateTime.from(a) },
+        TemporalQuery<LocalDateTime> { a -> LocalDateTime.from(a) },
+        TemporalQuery<LocalDate> { a -> LocalDate.from(a) }
+      )
+    return Date.from(when (temporal) {
+      is OffsetDateTime -> temporal.toInstant()
+      is LocalDateTime -> temporal.toInstant(ZoneOffset.UTC)
+      is LocalDate -> Instant.ofEpochSecond(temporal.toEpochSecond(LocalTime.MIDNIGHT, ZoneOffset.UTC))
+      else -> throw RuntimeException()
+    })
   }
 
   fun parseTimestamp(value: String): Date {

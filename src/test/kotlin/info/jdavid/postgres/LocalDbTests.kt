@@ -6,7 +6,7 @@ import org.junit.Test
 class LocalDbTests {
 
   @Test
-  fun test1() {
+  fun test() {
     runBlocking {
       Authentication.Credentials.PasswordCredentials().connectTo("postgres").use {
         println(it.update(
