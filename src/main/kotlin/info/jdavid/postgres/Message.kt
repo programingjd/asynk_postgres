@@ -418,7 +418,7 @@ sealed class Message {
               list.add(null)
             }
             else {
-              buffer.get(data, 0, len)
+              if (len != 0) buffer.get(data, 0, len)
               list.add(String(data, 0, len))
             }
           }

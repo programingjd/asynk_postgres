@@ -1,5 +1,8 @@
 package info.jdavid.postgres
 
+import kotlinx.coroutines.experimental.async
+import kotlinx.coroutines.experimental.channels.Channel
+import kotlinx.coroutines.experimental.channels.SendChannel
 import kotlinx.coroutines.experimental.nio.aConnect
 import kotlinx.coroutines.experimental.nio.aRead
 import kotlinx.coroutines.experimental.nio.aWrite
@@ -12,6 +15,8 @@ import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousSocketChannel
 import java.util.LinkedList
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.experimental.CoroutineContext
+import kotlin.coroutines.experimental.buildIterator
 import kotlin.coroutines.experimental.buildSequence
 
 class Connection internal constructor(private val channel: AsynchronousSocketChannel,
@@ -34,7 +39,27 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
 
   suspend fun update(preparedStatement: PreparedStatement,
                      params: Iterable<Any?> = emptyList()): Int {
-    val (_, messages) = execute(preparedStatement, params)
+    val portalName: ByteArray? = null
+    val unnamed = preparedStatement.name == null
+    bind(preparedStatement.name, portalName, params)
+    describe(portalName)
+    execute(portalName, 0)
+    if (unnamed) close(preparedStatement) else close(portalName)
+    sync()
+    val messages = receive()
+    messages.forEach {
+      when (it) {
+        is Message.ErrorResponse -> err(it.toString())
+        is Message.NoticeResponse -> warn(it.toString())
+      }
+    }
+    if (unnamed) {
+      messages.find { it is Message.ParseComplete } ?: throw RuntimeException(
+        "Failed to parse statement:\n${preparedStatement.query}")
+    }
+    messages.find { it is Message.BindComplete } ?: throw RuntimeException(
+      "Failed to bind parameters to statement:\n${preparedStatement.query}\n${params.joinToString(", ")}"
+    )
     val tag =
       (
         (messages.find { it is Message.CommandComplete } ?: throw RuntimeException())
@@ -52,37 +77,20 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
     }
   }
 
-  suspend fun query(sqlStatement: String, params: Iterable<Any?> = emptyList()): List<Map<String, Any?>> {
+  suspend fun query(sqlStatement: String, params: Iterable<Any?> = emptyList()): ResultSet {
     val statement = prepare(sqlStatement, null)
     return query(statement, params)
   }
 
   suspend fun query(preparedStatement: PreparedStatement,
-                    params: Iterable<Any?> = emptyList()): List<Map<String, Any?>> {
-    val (fields, messages) = execute(preparedStatement, params)
-    val results = mutableListOf<Map<String, Any?>>()
-//    return buildSequence {
-//
-//    }
-    appendResults(fields, results, messages).apply {
-      find { it is Message.CommandComplete } ?: throw RuntimeException()
-      find { it is Message.CloseComplete } ?: throw RuntimeException()
-      find { it is Message.ReadyForQuery } ?: throw RuntimeException()
-    }
-    return results
-  }
-
-  private suspend fun execute(preparedStatement: PreparedStatement,
-                              params: Iterable<Any?>): Pair<List<Pair<String, String>>,
-                                                            List<Message.FromServer>> {
+                    params: Iterable<Any?> = emptyList()): ResultSet {
     val batchSize = 100
     val portalName: ByteArray? = null
-    val unamed = preparedStatement.name == null
+    val unnamed = preparedStatement.name == null
     bind(preparedStatement.name, portalName, params)
     describe(portalName)
     execute(portalName, batchSize)
-    if (unamed) close(preparedStatement) else close(portalName)
-    sync()
+    send(Message.Flush())
     val messages = receive()
     messages.forEach {
       when (it) {
@@ -90,7 +98,7 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
         is Message.NoticeResponse -> warn(it.toString())
       }
     }
-    if (unamed) {
+    if (unnamed) {
       messages.find { it is Message.ParseComplete } ?: throw RuntimeException(
         "Failed to parse statement:\n${preparedStatement.query}")
     }
@@ -100,13 +108,40 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
     val fields =
       messages.find { it is Message.NoData || it is Message.RowDescription }?.
         let { if (it is Message.RowDescription) it.fields else emptyList() } ?:
-        throw RuntimeException()
-    return fields to messages
+      throw RuntimeException()
+
+
+    return buildSequence {
+      var m = messages
+      while (true) {
+        yieldAll(appendResults(fields, m, batchSize))
+        if (m.find { it is Message.CommandComplete } != null) {
+          m.find { it is Message.CloseComplete } ?: throw RuntimeException()
+          m.find { it is Message.ReadyForQuery } ?: throw RuntimeException()
+          break
+        }
+        m.find { it is Message.PortalSuspended } ?: throw RuntimeException()
+        async {
+          execute(portalName, batchSize)
+          send(Message.Flush())
+          m = receive()
+        }
+        m.forEach {
+          when (it) {
+            is Message.ErrorResponse -> err(it.toString())
+            is Message.NoticeResponse -> warn(it.toString())
+          }
+        }
+      }
+      if (unnamed) close(preparedStatement) else close(portalName)
+      sync()
+    }
   }
 
   private fun appendResults(fields: List<Pair<String, String>>,
-                            results: MutableList<Map<String, Any?>>,
-                            messages: List<Message.FromServer>): List<Message.FromServer> {
+                            messages: List<Message.FromServer>,
+                            batchSize: Int): List<Map<String, Any?>> {
+    val list = ArrayList<Map<String, Any?>>(batchSize)
     val n = fields.size
     messages.filterIsInstance<Message.DataRow>().forEach {
       val values = it.values
@@ -117,9 +152,9 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
         val result = values[i]
         map[field.first] = if (result == null) null else TextFormat.parse(field.second, result)
       }
-      results.add(map)
+      list.add(map)
     }
-    return messages
+    return list
   }
 
   suspend fun close(preparedStatement: PreparedStatement) {
@@ -188,7 +223,8 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
 
   internal suspend fun receive(): List<Message.FromServer> {
     buffer.clear()
-    channel.aRead(buffer, 5000L, TimeUnit.MILLISECONDS)
+    val n = channel.aRead(buffer, 5000L, TimeUnit.MILLISECONDS)
+    if (n == buffer.capacity()) throw RuntimeException("Connection buffer too small.")
     buffer.flip()
     val list = LinkedList<Message.FromServer>()
     while(buffer.remaining() > 0) {
@@ -227,7 +263,7 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
       val channel = AsynchronousSocketChannel.open()
       try {
         channel.aConnect(address)
-        val buffer = ByteBuffer.allocate(4096)
+        val buffer = ByteBuffer.allocateDirect(4194304) // needs to hold any RowData message
         val connection = Connection(channel, buffer)
         connection.send(Message.StartupMessage(credentials.username, database))
         val messages = Authentication.authenticate(connection, credentials)

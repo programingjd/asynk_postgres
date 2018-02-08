@@ -14,13 +14,13 @@ fun main(args: Array<String>) {
     Authentication.Credentials.PasswordCredentials(username, password).
       connectTo(database).use {
       println(it.parameters())
-      val prepared = it.prepare("SELECT * FROM test")
-      it.close(prepared)
-      println(json(it.query("SELECT * FROM test")))
-      println(it.update("INSERT INTO test (name) VALUES (?);", listOf("Name2")))
-      for (i in 1..500) {
-        println(it.update("INSERT INTO test (name) VALUES (?);", listOf("Name${i+502}")))
-      }
+      //val prepared = it.prepare("SELECT * FROM test")
+      //it.close(prepared)
+      println(json(it.query("SELECT * FROM test").toList()))
+      //println(it.update("INSERT INTO test (name) VALUES (?);", listOf("Name2")))
+      //for (i in 1..500) {
+      //  println(it.update("INSERT INTO test (name) VALUES (?);", listOf("Name${i+502}")))
+      //}
     }
   }
 }
