@@ -1,7 +1,8 @@
 package info.jdavid.postgres
 
+import kotlinx.coroutines.experimental.async
+import kotlinx.coroutines.experimental.channels.Channel
 import kotlinx.coroutines.experimental.channels.ReceiveChannel
-import kotlinx.coroutines.experimental.channels.produce
 import kotlinx.coroutines.experimental.nio.aConnect
 import kotlinx.coroutines.experimental.nio.aRead
 import kotlinx.coroutines.experimental.nio.aWrite
@@ -108,11 +109,11 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
         let { if (it is Message.RowDescription) it.fields else emptyList() } ?:
       throw RuntimeException()
 
-    return produce<Map<String,Any?>>(EmptyCoroutineContext) {
+    val channel = Channel<Map<String, Any?>>(batchSize)
+    async(EmptyCoroutineContext) {
       var m = messages
       while (true) {
-        (appendResults(fields, m, batchSize)).forEach { send(it) }
-        println("loop")
+        (appendResults(fields, m, batchSize)).forEach { channel.send(it) }
         if (m.find { it is Message.CommandComplete } != null) {
           break
         }
@@ -132,7 +133,9 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
       m = receive()
       m.find { it is Message.CloseComplete } ?: throw RuntimeException()
       m.find { it is Message.ReadyForQuery } ?: throw RuntimeException()
+      channel.close()
     }
+    return channel
   }
 
   private fun appendResults(fields: List<Pair<String, String>>,

@@ -16,6 +16,8 @@ fun main(args: Array<String>) {
       println(it.parameters())
       //val prepared = it.prepare("SELECT * FROM test")
       //it.close(prepared)
+//      it.query("SELECT * FROM test")
+//      delay(5000)
       for (row in it.query("SELECT * FROM test")) {
         println(json(row))
       }
