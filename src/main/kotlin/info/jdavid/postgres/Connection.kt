@@ -1,8 +1,7 @@
 package info.jdavid.postgres
 
-import kotlinx.coroutines.experimental.async
 import kotlinx.coroutines.experimental.channels.Channel
-import kotlinx.coroutines.experimental.channels.ReceiveChannel
+import kotlinx.coroutines.experimental.launch
 import kotlinx.coroutines.experimental.nio.aConnect
 import kotlinx.coroutines.experimental.nio.aRead
 import kotlinx.coroutines.experimental.nio.aWrite
@@ -76,13 +75,13 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
   }
 
   suspend fun query(sqlStatement: String,
-                    params: Iterable<Any?> = emptyList()): ReceiveChannel<Map<String, Any?>> {
+                    params: Iterable<Any?> = emptyList()): ResultSet {
     val statement = prepare(sqlStatement, null)
     return query(statement, params)
   }
 
   suspend fun query(preparedStatement: PreparedStatement,
-                    params: Iterable<Any?> = emptyList()): ReceiveChannel<Map<String, Any?>> {
+                    params: Iterable<Any?> = emptyList()): ResultSet {
     val batchSize = 100
     val portalName: ByteArray? = null
     val unnamed = preparedStatement.name == null
@@ -110,9 +109,10 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
       throw RuntimeException()
 
     val channel = Channel<Map<String, Any?>>(batchSize)
-    async(EmptyCoroutineContext) {
+    launch(EmptyCoroutineContext) {
       var m = messages
       while (true) {
+        // TODO check if close for send and cancel portal is so
         (appendResults(fields, m, batchSize)).forEach { channel.send(it) }
         if (m.find { it is Message.CommandComplete } != null) {
           break
@@ -135,7 +135,7 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
       m.find { it is Message.ReadyForQuery } ?: throw RuntimeException()
       channel.close()
     }
-    return channel
+    return ResultSet(channel)
   }
 
   private fun appendResults(fields: List<Pair<String, String>>,
@@ -252,6 +252,11 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
       }
       this.query = sb.toString()
     }
+  }
+
+  class ResultSet(private val channel: Channel<Map<String, Any?>>): Closeable {
+    operator fun iterator() = channel.iterator()
+    override fun close() { channel.cancel() }
   }
 
   companion object {
