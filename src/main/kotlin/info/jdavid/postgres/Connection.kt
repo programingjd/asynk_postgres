@@ -1,8 +1,8 @@
 package info.jdavid.postgres
 
 import kotlinx.coroutines.experimental.async
-import kotlinx.coroutines.experimental.channels.Channel
-import kotlinx.coroutines.experimental.channels.SendChannel
+import kotlinx.coroutines.experimental.channels.ReceiveChannel
+import kotlinx.coroutines.experimental.channels.produce
 import kotlinx.coroutines.experimental.nio.aConnect
 import kotlinx.coroutines.experimental.nio.aRead
 import kotlinx.coroutines.experimental.nio.aWrite
@@ -15,9 +15,7 @@ import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousSocketChannel
 import java.util.LinkedList
 import java.util.concurrent.TimeUnit
-import kotlin.coroutines.experimental.CoroutineContext
-import kotlin.coroutines.experimental.buildIterator
-import kotlin.coroutines.experimental.buildSequence
+import kotlin.coroutines.experimental.*
 
 class Connection internal constructor(private val channel: AsynchronousSocketChannel,
                                       private val buffer: ByteBuffer): Closeable {
@@ -77,13 +75,14 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
     }
   }
 
-  suspend fun query(sqlStatement: String, params: Iterable<Any?> = emptyList()): ResultSet {
+  suspend fun query(sqlStatement: String,
+                    params: Iterable<Any?> = emptyList()): ReceiveChannel<Map<String, Any?>> {
     val statement = prepare(sqlStatement, null)
     return query(statement, params)
   }
 
   suspend fun query(preparedStatement: PreparedStatement,
-                    params: Iterable<Any?> = emptyList()): ResultSet {
+                    params: Iterable<Any?> = emptyList()): ReceiveChannel<Map<String, Any?>> {
     val batchSize = 100
     val portalName: ByteArray? = null
     val unnamed = preparedStatement.name == null
@@ -110,14 +109,11 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
         let { if (it is Message.RowDescription) it.fields else emptyList() } ?:
       throw RuntimeException()
 
-
-    return buildSequence {
+    return produce<Map<String,Any?>>(EmptyCoroutineContext) {
       var m = messages
       while (true) {
-        yieldAll(appendResults(fields, m, batchSize))
+        (appendResults(fields, m, batchSize)).forEach { send(it) }
         if (m.find { it is Message.CommandComplete } != null) {
-          m.find { it is Message.CloseComplete } ?: throw RuntimeException()
-          m.find { it is Message.ReadyForQuery } ?: throw RuntimeException()
           break
         }
         m.find { it is Message.PortalSuspended } ?: throw RuntimeException()
@@ -135,6 +131,9 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
       }
       if (unnamed) close(preparedStatement) else close(portalName)
       sync()
+      m = receive()
+      m.find { it is Message.CloseComplete } ?: throw RuntimeException()
+      m.find { it is Message.ReadyForQuery } ?: throw RuntimeException()
     }
   }
 
