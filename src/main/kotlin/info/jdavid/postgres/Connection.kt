@@ -1,6 +1,5 @@
 package info.jdavid.postgres
 
-import kotlinx.coroutines.experimental.async
 import kotlinx.coroutines.experimental.channels.ReceiveChannel
 import kotlinx.coroutines.experimental.channels.produce
 import kotlinx.coroutines.experimental.nio.aConnect
@@ -113,15 +112,14 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
       var m = messages
       while (true) {
         (appendResults(fields, m, batchSize)).forEach { send(it) }
+        println("loop")
         if (m.find { it is Message.CommandComplete } != null) {
           break
         }
         m.find { it is Message.PortalSuspended } ?: throw RuntimeException()
-        async {
-          execute(portalName, batchSize)
-          send(Message.Flush())
-          m = receive()
-        }
+        execute(portalName, batchSize)
+        send(Message.Flush())
+        m = receive()
         m.forEach {
           when (it) {
             is Message.ErrorResponse -> err(it.toString())
