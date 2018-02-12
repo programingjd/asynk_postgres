@@ -1,6 +1,7 @@
 package info.jdavid.postgres
 
 import kotlinx.coroutines.experimental.channels.Channel
+import kotlinx.coroutines.experimental.channels.toList
 import kotlinx.coroutines.experimental.launch
 import kotlinx.coroutines.experimental.nio.aConnect
 import kotlinx.coroutines.experimental.nio.aRead
@@ -44,12 +45,6 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
     if (unnamed) close(preparedStatement) else close(portalName)
     sync()
     val messages = receive()
-    messages.forEach {
-      when (it) {
-        is Message.ErrorResponse -> err(it.toString())
-        is Message.NoticeResponse -> warn(it.toString())
-      }
-    }
     if (unnamed) {
       messages.find { it is Message.ParseComplete } ?: throw RuntimeException(
         "Failed to parse statement:\n${preparedStatement.query}")
@@ -90,12 +85,6 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
     execute(portalName, batchSize)
     send(Message.Flush())
     val messages = receive()
-    messages.forEach {
-      when (it) {
-        is Message.ErrorResponse -> err(it.toString())
-        is Message.NoticeResponse -> warn(it.toString())
-      }
-    }
     if (unnamed) {
       messages.find { it is Message.ParseComplete } ?: throw RuntimeException(
         "Failed to parse statement:\n${preparedStatement.query}")
@@ -121,12 +110,6 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
         execute(portalName, batchSize)
         send(Message.Flush())
         m = receive()
-        m.forEach {
-          when (it) {
-            is Message.ErrorResponse -> err(it.toString())
-            is Message.NoticeResponse -> warn(it.toString())
-          }
-        }
       }
       if (unnamed) close(preparedStatement) else close(portalName)
       sync()
@@ -162,12 +145,6 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
     if (preparedStatement.name != null) {
       send(Message.Flush())
       val messages = receive()
-      messages.forEach {
-        when (it) {
-          is Message.ErrorResponse -> err(it.toString())
-          is Message.NoticeResponse -> warn(it.toString())
-        }
-      }
       messages.find { it is Message.CloseComplete } ?: throw RuntimeException()
     }
   }
@@ -231,10 +208,17 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
       val message = Message.fromBytes(buffer)
       list.add(message)
     }
+    list.forEach {
+      when (it) {
+        is Message.ErrorResponse -> err(it.toString())
+        is Message.NoticeResponse -> warn(it.toString())
+        is Message.ParameterStatus -> props[it.key] = it.value
+      }
+    }
     return list
   }
 
-  class PreparedStatement internal constructor(internal val name: ByteArray?, query: String) {
+  inner class PreparedStatement internal constructor(internal val name: ByteArray?, query: String) {
     internal val query: String
     init {
       val sb = StringBuilder(query.length + 16)
@@ -252,11 +236,15 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
       }
       this.query = sb.toString()
     }
+    suspend fun query(params: Iterable<Any?> = emptyList()) = this@Connection.query(this, params)
+    suspend fun update(params: Iterable<Any?> = emptyList()) = this@Connection.update(this, params)
+    suspend fun close() = this@Connection.close(this)
   }
 
   class ResultSet(private val channel: Channel<Map<String, Any?>>): Closeable {
     operator fun iterator() = channel.iterator()
     override fun close() { channel.cancel() }
+    suspend fun toList() = channel.toList()
   }
 
   companion object {
@@ -272,21 +260,12 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
         val connection = Connection(channel, buffer)
         connection.send(Message.StartupMessage(credentials.username, database))
         val messages = Authentication.authenticate(connection, credentials)
-        messages.forEach {
-          when (it) {
-            is Message.ErrorResponse -> err(it.toString())
-            is Message.NoticeResponse -> warn(it.toString())
-          }
-        }
         messages.find { it is Message.ReadyForQuery } ?: throw RuntimeException()
         val (processId, privateKey) =
           (messages.find { it is Message.BackendKeyData } ?: throw RuntimeException())
             as Message.BackendKeyData
         connection.processId = processId
         connection.privateKey = privateKey
-        messages.forEach {
-          if (it is Message.ParameterStatus) connection.props[it.key] = it.value
-        }
         return connection
       }
       catch (e: Exception) {
