@@ -5,7 +5,6 @@ import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.LocalDateTime
 import java.time.LocalDate
-import java.time.LocalTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeFormatter.ISO_LOCAL_DATE
@@ -149,7 +148,7 @@ internal object TextFormat {
     return Date.from(when (temporal) {
       is OffsetDateTime -> temporal.toInstant()
       is LocalDateTime -> temporal.toInstant(ZoneOffset.UTC)
-      is LocalDate -> Instant.ofEpochSecond(temporal.toEpochSecond(LocalTime.MIDNIGHT, ZoneOffset.UTC))
+      is LocalDate -> Instant.ofEpochSecond(temporal.atStartOfDay(ZoneOffset.UTC).toEpochSecond())
       else -> throw RuntimeException()
     })
   }

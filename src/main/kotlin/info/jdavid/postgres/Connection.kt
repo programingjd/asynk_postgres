@@ -30,13 +30,13 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
     return props.toMap()
   }
 
-  suspend fun update(sqlStatement: String, params: Iterable<Any?> = emptyList()): Int {
+  suspend fun affectedRows(sqlStatement: String, params: Iterable<Any?> = emptyList()): Int {
     val statement = prepare(sqlStatement, null)
-    return update(statement, params)
+    return affectedRows(statement, params)
   }
 
-  suspend fun update(preparedStatement: PreparedStatement,
-                     params: Iterable<Any?> = emptyList()): Int {
+  suspend fun affectedRows(preparedStatement: PreparedStatement,
+                           params: Iterable<Any?> = emptyList()): Int {
     val portalName: ByteArray? = null
     val unnamed = preparedStatement.name == null
     bind(preparedStatement.name, portalName, params)
@@ -69,14 +69,14 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
     }
   }
 
-  suspend fun query(sqlStatement: String,
-                    params: Iterable<Any?> = emptyList()): ResultSet {
+  suspend fun rows(sqlStatement: String,
+                   params: Iterable<Any?> = emptyList()): ResultSet {
     val statement = prepare(sqlStatement, null)
-    return query(statement, params)
+    return rows(statement, params)
   }
 
-  suspend fun query(preparedStatement: PreparedStatement,
-                    params: Iterable<Any?> = emptyList()): ResultSet {
+  suspend fun rows(preparedStatement: PreparedStatement,
+                   params: Iterable<Any?> = emptyList()): ResultSet {
     val batchSize = 100
     val portalName: ByteArray? = null
     val unnamed = preparedStatement.name == null
@@ -194,8 +194,8 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
   }
 
   internal suspend fun send(message: Message.FromClient) {
-    message.writeTo(buffer.clear())
-    channel.aWrite(buffer.flip(), 5000L, TimeUnit.MILLISECONDS)
+    message.writeTo(buffer.clear() as ByteBuffer)
+    channel.aWrite(buffer.flip() as ByteBuffer, 5000L, TimeUnit.MILLISECONDS)
   }
 
   internal suspend fun receive(): List<Message.FromServer> {
@@ -236,8 +236,8 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
       }
       this.query = sb.toString()
     }
-    suspend fun query(params: Iterable<Any?> = emptyList()) = this@Connection.query(this, params)
-    suspend fun update(params: Iterable<Any?> = emptyList()) = this@Connection.update(this, params)
+    suspend fun rows(params: Iterable<Any?> = emptyList()) = this@Connection.rows(this, params)
+    suspend fun affectedRows(params: Iterable<Any?> = emptyList()) = this@Connection.affectedRows(this, params)
     suspend fun close() = this@Connection.close(this)
   }
 

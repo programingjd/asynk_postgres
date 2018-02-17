@@ -10,7 +10,7 @@ class LocalDbTests {
   fun testSimple() {
     runBlocking {
       Authentication.Credentials.PasswordCredentials().connectTo("postgres").use {
-        assertEquals(0, it.update(
+        assertEquals(0, it.affectedRows(
           """
             CREATE TEMPORARY TABLE test (
               id             serial    PRIMARY KEY,
@@ -20,25 +20,25 @@ class LocalDbTests {
             )
           """.trimIndent()
         ))
-        assertEquals(1, it.update(
+        assertEquals(1, it.affectedRows(
           """
             INSERT INTO test (name) VALUES (?)
           """.trimIndent(),
           listOf("Name1")
         ))
-        assertEquals(1, it.update(
+        assertEquals(1, it.affectedRows(
           """
             INSERT INTO test (name, active) VALUES (?, ?)
           """.trimIndent(),
           listOf("Name2", true)
         ))
-        assertEquals(1, it.update(
+        assertEquals(1, it.affectedRows(
           """
             INSERT INTO test (name, active) VALUES (?, ?)
           """.trimIndent(),
           listOf("Name3", false)
         ))
-        it.query(
+        it.rows(
           """
             SELECT * FROM test ORDER BY name
           """.trimIndent()
@@ -51,12 +51,12 @@ class LocalDbTests {
           assertEquals("Name3", get(2)["name"])
           assertFalse(get(2)["active"] as Boolean)
         }
-        assertEquals(2, it.update(
+        assertEquals(2, it.affectedRows(
           """
             UPDATE test SET active=TRUE WHERE active=FALSE
           """.trimIndent()
         ))
-        it.query(
+        it.rows(
           """
             SELECT * FROM test ORDER BY name
           """.trimIndent()
@@ -69,12 +69,12 @@ class LocalDbTests {
           assertEquals("Name3", get(2)["name"])
           assertTrue(get(2)["active"] as Boolean)
         }
-        assertEquals(2, it.update(
+        assertEquals(2, it.affectedRows(
           """
             UPDATE test SET active=FALSE WHERE NOT(name LIKE '%2')
           """.trimIndent()
         ))
-        it.query(
+        it.rows(
           """
             SELECT * FROM test ORDER BY name
           """.trimIndent()
@@ -87,12 +87,12 @@ class LocalDbTests {
           assertEquals("Name3", get(2)["name"])
           assertFalse(get(2)["active"] as Boolean)
         }
-        assertEquals(2, it.update(
+        assertEquals(2, it.affectedRows(
           """
               DELETE FROM test WHERE active=FALSE
             """
         ))
-        it.query(
+        it.rows(
           """
             SELECT * FROM test ORDER BY name
           """.trimIndent()
@@ -109,7 +109,7 @@ class LocalDbTests {
   fun testPreparedStatement() {
     runBlocking {
       Authentication.Credentials.PasswordCredentials().connectTo("postgres").use {
-        assertEquals(0, it.update(
+        assertEquals(0, it.affectedRows(
           """
             CREATE TEMPORARY TABLE test (
               id             serial    PRIMARY KEY,
@@ -123,28 +123,28 @@ class LocalDbTests {
             INSERT INTO test (name) VALUES (?)
           """.trimIndent()).apply {
           assertNotNull(name)
-          assertEquals(1, update(listOf("Name1")))
-          assertEquals(1, update(listOf("Name2")))
-          assertEquals(1, update(listOf("Name3")))
-          assertEquals(1, update(listOf("Name4")))
+          assertEquals(1, affectedRows(listOf("Name1")))
+          assertEquals(1, affectedRows(listOf("Name2")))
+          assertEquals(1, affectedRows(listOf("Name3")))
+          assertEquals(1, affectedRows(listOf("Name4")))
           close()
           try {
-            update(listOf("Name5"))
+            affectedRows(listOf("Name5"))
             fail("Execution of closed prepared statement should have failed.")
           }
           catch (ignore: Exception) {}
         }
         it.prepare("SELECT * FROM test WHERE active=?").apply {
           assertNotNull(name)
-          assertEquals(4, query(listOf(false)).toList().size)
-          assertEquals(0, query(listOf(true)).toList().size)
-          assertEquals(1, it.update("DELETE FROM test WHERE name=?", listOf("Name4")))
-          assertEquals(3, query(listOf(false)).toList().size)
-          assertEquals(1, it.update("UPDATE test SET active=TRUE WHERE name=?", listOf("Name1")))
-          assertEquals(2, query(listOf(false)).toList().size)
+          assertEquals(4, rows(listOf(false)).toList().size)
+          assertEquals(0, rows(listOf(true)).toList().size)
+          assertEquals(1, it.affectedRows("DELETE FROM test WHERE name=?", listOf("Name4")))
+          assertEquals(3, rows(listOf(false)).toList().size)
+          assertEquals(1, it.affectedRows("UPDATE test SET active=TRUE WHERE name=?", listOf("Name1")))
+          assertEquals(2, rows(listOf(false)).toList().size)
           close()
           try {
-            query(listOf(false))
+            rows(listOf(false))
             fail("Execution of closed prepared statement should have failed.")
           }
           catch (ignore: Exception) {}

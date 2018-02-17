@@ -17,22 +17,22 @@ fun main(args: Array<String>) {
       println(it.parameters())
       //val prepared = it.prepare("SELECT * FROM test")
       //it.close(prepared)
-//      it.query("SELECT * FROM test")
+//      it.rows("SELECT * FROM test")
 //      delay(5000)
-//      for (row in it.query("SELECT * FROM test")) {
+//      for (row in it.rows("SELECT * FROM test")) {
 //        println(json(row))
 //      }
-      it.query("SELECT * FROM test").apply {
+      it.rows("SELECT * FROM test").apply {
         val iterator = iterator()
         println(json(iterator.next()))
         println(json(iterator.next()))
         //println(json(iterator.next()))
       }
-      it.query("SELECT * FROM test")
+      it.rows("SELECT * FROM test")
       delay(5000)
-      //println(it.update("INSERT INTO test (name) VALUES (?);", listOf("Name2")))
+      //println(it.affectedRows("INSERT INTO test (name) VALUES (?);", listOf("Name2")))
       //for (i in 1..500) {
-      //  println(it.update("INSERT INTO test (name) VALUES (?);", listOf("Name${i+502}")))
+      //  println(it.affectedRows("INSERT INTO test (name) VALUES (?);", listOf("Name${i+502}")))
       //}
     }
   }
