@@ -159,12 +159,6 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
     if (name != null) {
       send(Message.Flush())
       val messages = receive()
-      messages.forEach {
-        when (it) {
-          is Message.ErrorResponse -> err(it.toString())
-          is Message.NoticeResponse -> warn(it.toString())
-        }
-      }
       messages.find { it is Message.ParseComplete } ?:
         throw RuntimeException("Failed to parse statement:\n${sqlStatement}")
     }
