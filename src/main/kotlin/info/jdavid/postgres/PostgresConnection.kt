@@ -17,8 +17,8 @@ import java.util.LinkedList
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.experimental.*
 
-class Connection internal constructor(private val channel: AsynchronousSocketChannel,
-                                      private val buffer: ByteBuffer): Closeable {
+class PostgresConnection internal constructor(private val channel: AsynchronousSocketChannel,
+                                              private val buffer: ByteBuffer): Closeable {
   private val props = mutableMapOf<String, String>()
   private var processId = 0
   private var privateKey = 0
@@ -230,9 +230,9 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
       }
       this.query = sb.toString()
     }
-    suspend fun rows(params: Iterable<Any?> = emptyList()) = this@Connection.rows(this, params)
-    suspend fun affectedRows(params: Iterable<Any?> = emptyList()) = this@Connection.affectedRows(this, params)
-    suspend fun close() = this@Connection.close(this)
+    suspend fun rows(params: Iterable<Any?> = emptyList()) = this@PostgresConnection.rows(this, params)
+    suspend fun affectedRows(params: Iterable<Any?> = emptyList()) = this@PostgresConnection.affectedRows(this, params)
+    suspend fun close() = this@PostgresConnection.close(this)
   }
 
   class ResultSet(private val channel: Channel<Map<String, Any?>>): Closeable {
@@ -244,14 +244,15 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
   companion object {
     suspend fun to(
       database: String,
-      credentials: Authentication.Credentials = Authentication.Credentials.UnsecuredCredentials(),
+      credentials: Authentication.PostgresCredentials =
+        Authentication.PostgresCredentials.UnsecuredCredentials(),
       address: SocketAddress = InetSocketAddress(InetAddress.getLoopbackAddress(), 5432)
-    ): Connection {
+    ): PostgresConnection {
       val channel = AsynchronousSocketChannel.open()
       try {
         channel.aConnect(address)
         val buffer = ByteBuffer.allocateDirect(4194304) // needs to hold any RowData message
-        val connection = Connection(channel, buffer)
+        val connection = PostgresConnection(channel, buffer)
         connection.send(Message.StartupMessage(credentials.username, database))
         val messages = Authentication.authenticate(connection, credentials)
         messages.find { it is Message.ReadyForQuery } ?: throw RuntimeException()
@@ -267,7 +268,7 @@ class Connection internal constructor(private val channel: AsynchronousSocketCha
         throw e
       }
     }
-    private val logger = LoggerFactory.getLogger(Connection::class.java)
+    private val logger = LoggerFactory.getLogger(PostgresConnection::class.java)
     private fun warn(message: String) = logger.warn(message)
     private fun err(message: String) = logger.error(message)
   }

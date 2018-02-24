@@ -6,22 +6,22 @@ import java.net.SocketAddress
 
 object Authentication {
 
-  internal suspend fun authenticate(connection: Connection,
-                                    credentials: Credentials): List<Message.FromServer> {
+  internal suspend fun authenticate(connection: PostgresConnection,
+                                    credentials: PostgresCredentials): List<Message.FromServer> {
     val messages = connection.receive()
     val authenticationMessage = messages.find { it is Message.Authentication } ?:
                                 throw RuntimeException("Expected authentication message.")
     when (authenticationMessage) {
       is Message.AuthenticationOk -> return messages
       is Message.AuthenticationCleartextPassword -> {
-        if (credentials !is Credentials.PasswordCredentials) throw Exception("Incompatible credentials.")
+        if (credentials !is PostgresCredentials.PasswordCredentials) throw Exception("Incompatible credentials.")
         connection.send(
           Message.PasswordMessage(credentials.username, credentials.password, authenticationMessage)
         )
         return authenticate(connection, credentials)
       }
       is Message.AuthenticationMD5Password -> {
-        if (credentials !is Credentials.PasswordCredentials) throw Exception("Incompatible credentials.")
+        if (credentials !is PostgresCredentials.PasswordCredentials) throw Exception("Incompatible credentials.")
         connection.send(
           Message.PasswordMessage(credentials.username, credentials.password, authenticationMessage)
         )
@@ -33,17 +33,17 @@ object Authentication {
 
   class Exception(message: String): RuntimeException(message)
 
-  sealed class Credentials(internal val username: String) {
+  sealed class PostgresCredentials(internal val username: String) {
 
-    class UnsecuredCredentials(username: String = "postgres"): Credentials(username)
+    class UnsecuredCredentials(username: String = "postgres"): PostgresCredentials(username)
     class PasswordCredentials(username: String = "postgres",
-                              internal val password: String = "postgres"): Credentials(username)
+                              internal val password: String = "postgres"): PostgresCredentials(username)
 
     suspend fun connectTo(
       database: String,
       address: SocketAddress = InetSocketAddress(InetAddress.getLoopbackAddress (), 5432)
-    ): Connection {
-      return Connection.to(database, this, address)
+    ): PostgresConnection {
+      return PostgresConnection.to(database, this, address)
     }
 
   }

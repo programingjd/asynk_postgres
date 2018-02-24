@@ -12,7 +12,7 @@ fun main(args: Array<String>) {
   val password = "postgres"
   val database = "postgres"
   runBlocking {
-    Authentication.Credentials.PasswordCredentials(username, password).
+    Authentication.PostgresCredentials.PasswordCredentials(username, password).
       connectTo(database).use {
       println(it.parameters())
       //val prepared = it.prepare("SELECT * FROM test")
