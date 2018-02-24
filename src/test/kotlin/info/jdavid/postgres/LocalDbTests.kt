@@ -5,11 +5,20 @@ import org.junit.Test
 import org.junit.Assert.*
 
 class LocalDbTests {
+  private val credentials: Authentication.Credentials
+  private val databaseName: String
+  init {
+    val properties = Utils.properties()
+    val username = properties.getProperty("postgres_username") ?: "postgres"
+    val password = properties.getProperty("postgres_password") ?: "postgres"
+    credentials = Authentication.Credentials.PasswordCredentials(username, password)
+    databaseName = properties.getProperty("postgres_database") ?: "postgres"
+  }
 
   @Test
   fun testSimple() {
     runBlocking {
-      Authentication.Credentials.PasswordCredentials().connectTo("postgres").use {
+      credentials.connectTo(databaseName).use {
         assertEquals(0, it.affectedRows(
           """
             CREATE TEMPORARY TABLE test (
@@ -108,7 +117,7 @@ class LocalDbTests {
   @Test
   fun testPreparedStatement() {
     runBlocking {
-      Authentication.Credentials.PasswordCredentials().connectTo("postgres").use {
+      credentials.connectTo(databaseName).use {
         assertEquals(0, it.affectedRows(
           """
             CREATE TEMPORARY TABLE test (
