@@ -177,7 +177,7 @@ sealed class Message {
           is Float -> "${it}F"
           is Long -> "${it}L"
           is Date -> "\"${it}\""
-          is String -> "\"${it}\""
+          is CharSequence -> "\"${it}\""
           else -> "${it}"
         }
       }
