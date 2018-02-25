@@ -5,13 +5,13 @@ import org.junit.Test
 import org.junit.Assert.*
 
 class LocalDbTests {
-  private val credentials: Authentication.PostgresCredentials
+  private val credentials: PostgresAuthentication.Credentials
   private val databaseName: String
   init {
     val properties = Utils.properties()
     val username = properties.getProperty("postgres_username") ?: "postgres"
     val password = properties.getProperty("postgres_password") ?: "postgres"
-    credentials = Authentication.PostgresCredentials.PasswordCredentials(username, password)
+    credentials = PostgresAuthentication.Credentials.PasswordCredentials(username, password)
     databaseName = properties.getProperty("postgres_database") ?: "postgres"
   }
 

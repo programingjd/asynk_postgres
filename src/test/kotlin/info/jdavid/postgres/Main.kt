@@ -8,12 +8,13 @@ import kotlinx.coroutines.experimental.runBlocking
 fun json(any: Any?) = ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT).writeValueAsString(any)
 
 fun main(args: Array<String>) {
-  val username = "postgres"
-  val password = "postgres"
-  val database = "postgres"
+  val properties = Utils.properties()
+  val username = properties.getProperty("postgres_username") ?: "postgres"
+  val password = properties.getProperty("postgres_password") ?: "postgres"
+  val credentials = PostgresAuthentication.Credentials.PasswordCredentials(username, password)
+  val database = properties.getProperty("postgres_database") ?: "postgres"
   runBlocking {
-    Authentication.PostgresCredentials.PasswordCredentials(username, password).
-      connectTo(database).use {
+    credentials.connectTo(database).use {
       println(it.parameters())
       //val prepared = it.prepare("SELECT * FROM test")
       //it.close(prepared)
