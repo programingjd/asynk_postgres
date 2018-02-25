@@ -6,6 +6,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
+import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeFormatter.ISO_LOCAL_DATE
 import java.time.format.DateTimeFormatter.ISO_LOCAL_TIME
@@ -53,6 +54,10 @@ internal object TextFormat {
       is Boolean -> formatBoolean(value)
       is ByteArray -> formatByteArray(value)
       is Date -> formatDate(value)
+      is ZonedDateTime -> formatInstant(value.toInstant())
+      is OffsetDateTime -> formatInstant(value.toInstant())
+      is LocalDateTime -> formatInstant(value.toInstant(ZoneOffset.UTC))
+      is LocalDate -> formatInstant(value.atStartOfDay(ZoneOffset.UTC).toInstant())
       is Instant -> formatInstant(value)
       is BooleanArray -> formatArray(value)
       is ShortArray -> formatArray(value)
@@ -146,6 +151,7 @@ internal object TextFormat {
         TemporalQuery<LocalDate> { a -> LocalDate.from(a) }
       )
     return Date.from(when (temporal) {
+      is ZonedDateTime -> temporal.toInstant()
       is OffsetDateTime -> temporal.toInstant()
       is LocalDateTime -> temporal.toInstant(ZoneOffset.UTC)
       is LocalDate -> Instant.ofEpochSecond(temporal.atStartOfDay(ZoneOffset.UTC).toEpochSecond())
