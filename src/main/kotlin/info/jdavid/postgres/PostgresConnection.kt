@@ -264,7 +264,8 @@ class PostgresConnection internal constructor(
     override suspend fun aClose() = this@PostgresConnection.close(this)
   }
 
-  class PostgresResultSet(private val channel: Channel<Map<String, Any?>>): Connection.ResultSet {
+  class PostgresResultSet internal constructor(
+                          private val channel: Channel<Map<String, Any?>>): Connection.ResultSet {
     override operator fun iterator() = channel.iterator()
     override fun close() { channel.cancel() }
     override suspend fun toList() = channel.toList()
