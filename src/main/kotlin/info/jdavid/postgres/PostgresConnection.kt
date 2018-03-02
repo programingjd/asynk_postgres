@@ -26,7 +26,14 @@ class PostgresConnection internal constructor(
   private var privateKey = 0
   private var statementCounter = 0
 
-  override fun close() = channel.close()
+  override suspend fun aClose() {
+    try {
+      send(Message.Terminate())
+    }
+    finally {
+      channel.close()
+    }
+  }
 
   fun parameters(): Map<String, String> {
     return props.toMap()
@@ -254,7 +261,7 @@ class PostgresConnection internal constructor(
     override suspend fun affectedRows(
       params: Iterable<Any?>
     ) = this@PostgresConnection.affectedRows(this, params)
-    override suspend fun close() = this@PostgresConnection.close(this)
+    override suspend fun aClose() = this@PostgresConnection.close(this)
   }
 
   class PostgresResultSet(private val channel: Channel<Map<String, Any?>>): Connection.ResultSet {

@@ -279,6 +279,14 @@ sealed class Message {
     }
   }
 
+  class Terminate: FromClient, Message() {
+    override fun toString() = "Terminate"
+    override fun writeTo(buffer: ByteBuffer) {
+      buffer.put('X'.toByte())
+      buffer.putInt(4)
+    }
+  }
+
   //--------------------------------------------------------------------------------------------------
 
   companion object {

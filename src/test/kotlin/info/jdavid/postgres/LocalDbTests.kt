@@ -1,5 +1,6 @@
 package info.jdavid.postgres
 
+import info.jdavid.sql.use
 import kotlinx.coroutines.experimental.runBlocking
 import org.junit.Test
 import org.junit.Assert.*
@@ -136,7 +137,7 @@ class LocalDbTests {
           assertEquals(1, affectedRows(listOf("Name2")))
           assertEquals(1, affectedRows(listOf("Name3")))
           assertEquals(1, affectedRows(listOf("Name4")))
-          close()
+          aClose()
           try {
             affectedRows(listOf("Name5"))
             fail("Execution of closed prepared statement should have failed.")
@@ -151,7 +152,7 @@ class LocalDbTests {
           assertEquals(3, rows(listOf(false)).toList().size)
           assertEquals(1, it.affectedRows("UPDATE test SET active=TRUE WHERE name=?", listOf("Name1")))
           assertEquals(2, rows(listOf(false)).toList().size)
-          close()
+          aClose()
           try {
             rows(listOf(false))
             fail("Execution of closed prepared statement should have failed.")
