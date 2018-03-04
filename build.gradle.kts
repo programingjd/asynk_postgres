@@ -24,7 +24,7 @@ plugins {
 }
 
 group = "info.jdavid.postgres"
-version = "1.0.0.6"
+version = "1.0.0.8"
 
 repositories {
   jcenter()
@@ -34,7 +34,7 @@ dependencies {
   compile(kotlin("stdlib-jdk8"))
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:0.22.3")
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-nio:0.22.3")
-  implementation("info.jdavid.sql:sql:1.0.0.8")
+  implementation("info.jdavid.sql:sql:1.0.0.9")
   implementation("org.slf4j:slf4j-api:1.7.25")
   testImplementation("junit:junit:4.12")
   testImplementation("com.fasterxml.jackson.core:jackson-databind:2.9.4")

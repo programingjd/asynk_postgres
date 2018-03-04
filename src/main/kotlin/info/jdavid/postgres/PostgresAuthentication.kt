@@ -41,11 +41,25 @@ object PostgresAuthentication {
                               internal val password: String = "postgres"): Credentials(username)
 
     override suspend fun connectTo(database: String) = connectTo(
-      database, InetSocketAddress(InetAddress.getLoopbackAddress(), 5432)
+      database, InetSocketAddress(InetAddress.getLoopbackAddress(), 5432), 4194304
+    )
+    override suspend fun connectTo(database: String, bufferSize: Int) = connectTo(
+      database, InetSocketAddress(InetAddress.getLoopbackAddress(), 5432), bufferSize
     )
 
-    override suspend fun connectTo(database: String, address: SocketAddress): PostgresConnection {
-      return PostgresConnection.to(database, this, address)
+    override suspend fun connectTo(database: String, address: InetAddress) = connectTo(
+      database, InetSocketAddress(address, 5432), 4194304
+    )
+    override suspend fun connectTo(database: String, address: InetAddress, bufferSize: Int) = connectTo(
+      database, InetSocketAddress(address, 5432), bufferSize
+    )
+
+    override suspend fun connectTo(database: String, address: SocketAddress) = connectTo(
+      database, address, 4194304
+    )
+    override suspend fun connectTo(database: String, address: SocketAddress,
+                                   bufferSize: Int): PostgresConnection {
+      return PostgresConnection.to(database, this, address, bufferSize)
     }
 
   }

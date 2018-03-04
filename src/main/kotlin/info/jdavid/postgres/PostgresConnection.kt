@@ -276,12 +276,16 @@ class PostgresConnection internal constructor(
       database: String,
       credentials: PostgresAuthentication.Credentials =
         PostgresAuthentication.Credentials.UnsecuredCredentials(),
-      address: SocketAddress = InetSocketAddress(InetAddress.getLoopbackAddress(), 5432)
+      address: SocketAddress = InetSocketAddress(InetAddress.getLoopbackAddress(), 5432),
+      bufferSize: Int = 4194304 // needs to hold any RowData message
     ): PostgresConnection {
       val channel = AsynchronousSocketChannel.open()
       try {
+        if (bufferSize < 1024) throw IllegalArgumentException(
+          "Buffer size ${bufferSize} is smaller than the minumum buffer size 1024."
+        )
         channel.aConnect(address)
-        val buffer = ByteBuffer.allocateDirect(4194304) // needs to hold any RowData message
+        val buffer = ByteBuffer.allocateDirect(bufferSize)
         val connection = PostgresConnection(channel, buffer)
         connection.send(Message.StartupMessage(credentials.username, database))
         val messages = PostgresAuthentication.authenticate(connection, credentials)
