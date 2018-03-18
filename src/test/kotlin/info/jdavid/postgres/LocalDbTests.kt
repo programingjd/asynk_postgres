@@ -286,15 +286,25 @@ class LocalDbTests {
         ).toList().apply {
           println(this)
           assertEquals(1, size)
-          assertEquals(1234, get(0)["i1"])
-          assertNull(get(0)["s1"])
-          assertEquals(true, get(0)["b1"])
-          assertNull(get(1)["i1"])
-          assertNull(get(1)["s1"])
-          assertEquals(false,get(1)["b1"])
-          assertNull(get(2)["i1"])
-          assertNull(get(2)["s1"])
-          assertNull(get(2)["b1"])
+          val ints = get(0)["i1"] as List<*>
+          assertEquals(1, ints.size)
+          assertEquals(1234, ints[0])
+          val texts = get(0)["s1"] as List<*>
+          assertEquals(2, texts.size)
+          val first = texts[0] as List<*>
+          val second = texts[1] as List<*>
+          assertEquals(3, first.size)
+          assertEquals("a", first[0])
+          assertEquals("b", first[1])
+          assertEquals("c", first[2])
+          assertEquals(3, second.size)
+          assertEquals("1", second[0])
+          assertEquals("2", second[1])
+          assertEquals("3", second[2])
+          val bools = get(0)["b1"] as List<*>
+          assertEquals(2, bools.size)
+          assertEquals(true, bools[0])
+          assertEquals(true, bools[1])
         }
       }
     }
