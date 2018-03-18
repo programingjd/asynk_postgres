@@ -16,6 +16,8 @@ import java.nio.channels.AsynchronousSocketChannel
 import java.util.LinkedList
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.experimental.EmptyCoroutineContext
+import kotlin.coroutines.experimental.coroutineContext
+
 typealias PreparedStatement=Connection.PreparedStatement<PostgresConnection>
 
 class PostgresConnection internal constructor(
@@ -118,7 +120,7 @@ class PostgresConnection internal constructor(
       throw RuntimeException()
 
     val channel = Channel<Map<String, Any?>>(batchSize)
-    launch(EmptyCoroutineContext) {
+    launch(coroutineContext + EmptyCoroutineContext) {
       var m = messages
       while (true) {
         // TODO check if close for send and cancel portal is so

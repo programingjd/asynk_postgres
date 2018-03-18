@@ -32,8 +32,8 @@ repositories {
 
 dependencies {
   compile(kotlin("stdlib-jdk8"))
-  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:0.22.3")
-  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-nio:0.22.3")
+  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:0.22.5")
+  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-nio:0.22.5")
   implementation("info.jdavid.sql:sql:1.0.0.9")
   implementation("org.slf4j:slf4j-api:1.7.25")
   testImplementation("junit:junit:4.12")

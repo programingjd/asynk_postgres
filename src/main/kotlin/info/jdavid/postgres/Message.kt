@@ -395,11 +395,11 @@ sealed class Message {
               if (b == 0.toByte()) break
               sb.appendCodePoint(b.toInt())
             }
-            val table = buffer.getInt()
-            val index = buffer.getShort()
+            /*val table =*/ buffer.getInt()
+            /*val index =*/ buffer.getShort()
             val oid = buffer.getInt()
             val len = buffer.getShort()
-            val modifier = buffer.getInt()
+            /*val modifier =*/ buffer.getInt()
             val format = buffer.getShort()
             assert(format == 0.toShort())
             sb.toString() to "${oid}:${len}"

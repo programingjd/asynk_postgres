@@ -21,6 +21,10 @@ internal object TextFormat {
     val index = typeDescription.indexOf(':')
     val oid = (if (index == -1) typeDescription else typeDescription.substring(0, index)).toInt()
     val type = Oids.fromOid(oid)
+    return parse(type, value)
+  }
+
+  internal fun parse(type: Oids, value: String): Any {
     return when (type) {
       Oids.Void -> throw RuntimeException()
       Oids.Boolean -> parseBoolean(value)
@@ -175,8 +179,77 @@ internal object TextFormat {
     TODO()
   }
 
-  fun <T: Oids> parseArray(value: String, type: T): List<Any> {
-    TODO()
+  private fun <T: Oids> parseArray(value: String, type: T): Any {
+    if (value.isEmpty() || value.first() != '{') return parse(type.arrayOf!!, value)
+    if (value.length < 2) throw IllegalArgumentException()
+    if (value.last() != '}') throw IllegalArgumentException()
+    val list = mutableListOf<Any?>()
+    var start = 1
+    var i = 1
+    var string = false
+    while (true) {
+      when (value[i]) {
+        '{' -> i += consumeArray(value, i + 1)
+        '"' -> {
+          if (string) throw IllegalArgumentException()
+          string = true
+          i += consumeString(value, i + 1)
+        }
+        ',', '}' -> {
+          val text = if (string) {
+            if (start + 1 > i - 1) throw IllegalArgumentException()
+            string = false
+            string(value, start, i)
+          } else value.substring(start, i)
+          if (text == "NULL" || text == "null") list.add(null) else list.add(parse(type, text))
+          start = i + 1
+        }
+      }
+      if (++i == value.length) break
+    }
+    return list
+  }
+
+  private fun consumeArray(value: String, start: Int): Int {
+    var i = start
+    while (true) {
+      when (value[i]) {
+        '{' -> i += consumeArray(value, i + 1)
+        '"' -> i += consumeString(value, i + 1)
+        '}' -> return i - start + 1
+      }
+      if (++i == value.length) throw IllegalArgumentException()
+    }
+  }
+
+  private fun consumeString(value: String, start: Int): Int {
+    var escaped = false
+    for (i in start until value.length) {
+      escaped = when (value[i]) {
+        '\\' -> !escaped
+        '"' -> if (escaped) false else return i - start + 1
+        else -> false
+      }
+    }
+    throw IllegalArgumentException()
+  }
+
+  private fun string(value: String, start: Int, end: Int): String {
+    var escaped = false
+    val s = StringBuilder(end - start - 2)
+    for (i in start + 1 until end - 1) {
+      escaped = when (value[i]) {
+        '\\' -> {
+          if (escaped) s.append('\\')
+          !escaped
+        }
+        else -> {
+          s.append(value[i])
+          false
+        }
+      }
+    }
+    return s.toString()
   }
 
 }
