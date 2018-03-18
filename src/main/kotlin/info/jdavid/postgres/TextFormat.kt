@@ -172,14 +172,20 @@ internal object TextFormat {
   }
 
   fun parseByteArray(value: String): ByteArray {
-    TODO()
+    if (value.length < 2) throw IllegalArgumentException()
+    if (value[0] != '\\' || value[1] != 'x') throw IllegalStateException(
+      "Only hex format is supported for bytea data type."
+    )
+    return ByteArray(value.length / 2 - 1, {
+      (hexDigit(value[it*2+2]).shl(4) + hexDigit(value[it*2+3])).toByte()
+    })
   }
 
   fun parsePoint(value: String): Pair<Double, Double> {
     TODO()
   }
 
-  private fun <T: Oids> parseArray(value: String, type: T): Any {
+  fun <T: Oids> parseArray(value: String, type: T): Any {
     if (value.isEmpty() || value.first() != '{') return parse(type.arrayOf!!, value)
     if (value.length < 2) throw IllegalArgumentException()
     if (value.last() != '}') throw IllegalArgumentException()
@@ -250,6 +256,13 @@ internal object TextFormat {
       }
     }
     return s.toString()
+  }
+
+  private fun hexDigit(c: Char): Int {
+    if (c <= '9') return c - '0'
+    if (c <= 'F') return c - 'A' + 10
+    if (c <= 'f') return c - 'a' + 10
+    throw IllegalArgumentException("Unexpected hex digit: ${c}")
   }
 
 }

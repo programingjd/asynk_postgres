@@ -260,6 +260,41 @@ class LocalDbTests {
   }
 
   @Test
+  fun testBytes() {
+    runBlocking {
+      credentials.connectTo(databaseName).use {
+        assertEquals(0, it.affectedRows(
+          """
+            CREATE TEMPORARY TABLE test (
+              id             serial    PRIMARY KEY,
+              data           bytea
+            )
+          """.trimIndent()
+        ))
+        assertEquals(1, it.affectedRows(
+          """
+            INSERT INTO test (data) VALUES (?)
+          """.trimIndent(),
+          listOf(byteArrayOf(0x01, 0x02, 0x03, 0x04))
+        ))
+        it.rows(
+          """
+            SELECT * FROM test ORDER BY id
+          """.trimIndent()
+        ).toList().apply {
+          println(this)
+          assertEquals(1, size)
+          val bytes = get(0)["data"] as ByteArray
+          assertEquals(4, bytes.size)
+          assertEquals(1.toByte(), bytes[0])
+          assertEquals(2.toByte(), bytes[1])
+          assertEquals(3.toByte(), bytes[2])
+        }
+      }
+    }
+  }
+
+  @Test
   fun testArrays() {
     runBlocking {
       credentials.connectTo(databaseName).use {
