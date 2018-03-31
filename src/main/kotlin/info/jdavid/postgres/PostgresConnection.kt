@@ -39,7 +39,7 @@ class PostgresConnection internal constructor(
 
 
   override suspend fun startTransaction() {
-    affectedRows("START TRANSACTION")
+    affectedRows("BEGIN")
   }
 
   override suspend fun commitTransaction() {
