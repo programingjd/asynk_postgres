@@ -345,4 +345,58 @@ class LocalDbTests {
     }
   }
 
+  @Test
+  fun testTransactions() {
+    runBlocking {
+      credentials.connectTo(databaseName).use {
+        assertEquals(0, it.affectedRows(
+          """
+            CREATE TEMPORARY TABLE test (
+              id             serial    PRIMARY KEY,
+              v              integer   NOT NULL DEFAULT 0
+            )
+          """.trimIndent()
+        ))
+        it.withTransaction {
+          assertEquals(1, it.affectedRows(
+            """
+            INSERT INTO test (v) VALUES (?)
+          """.trimIndent(),
+            listOf(34)
+          ))
+          assertEquals(1, it.affectedRows(
+            """
+            INSERT INTO test (v) VALUES (?)
+          """.trimIndent(),
+            listOf(35)
+          ))
+        }
+        try {
+          it.withTransaction {
+            assertEquals(1, it.affectedRows(
+              """
+            INSERT INTO test (v) VALUES (?)
+          """.trimIndent(),
+              listOf(52)
+            ))
+            throw RollbackException()
+          }
+        }
+        catch (ignore: RollbackException) {}
+        it.rows(
+          """
+            SELECT * FROM test ORDER BY id
+          """.trimIndent()
+        ).toList().apply {
+          assertEquals(2, size)
+          assertEquals(34, get(0)["v"])
+          assertEquals(35, get(1)["v"])
+        }
+      }
+    }
+  }
+
+
+  private class RollbackException: RuntimeException()
+
 }
