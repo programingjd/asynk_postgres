@@ -27,8 +27,8 @@ class WorldTests {
     runBlocking {
       credentials.connectTo(databaseName).use { connection ->
         connection.withTransaction {
-          split.forEachIndexed { i: Int, it: String ->
-            if (it.trim().isEmpty()) return@forEachIndexed
+          split.forEach {
+            if (it.trim().isEmpty()) return@forEach
             connection.affectedRows(it)
           }
         }

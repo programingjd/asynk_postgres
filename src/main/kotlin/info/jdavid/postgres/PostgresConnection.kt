@@ -37,16 +37,17 @@ class PostgresConnection internal constructor(
     }
   }
 
+
+  override suspend fun startTransaction() {
+    affectedRows("START TRANSACTION")
+  }
+
   override suspend fun commitTransaction() {
-    TODO()
+    affectedRows("COMMIT")
   }
 
   override suspend fun rollbackTransaction() {
-    TODO()
-  }
-
-  override suspend fun startTransaction() {
-    TODO()
+    affectedRows("ROLLBACK")
   }
 
   fun parameters(): Map<String, String> {
@@ -87,14 +88,18 @@ class PostgresConnection internal constructor(
         (messages.find { it is Message.CommandComplete } ?: throw RuntimeException())
           as Message.CommandComplete
       ).tag
-    val i = tag.indexOf(' ').apply { if (this == -1) throw RuntimeException() }
-    val command = tag.substring(0, i)
+    val i = tag.indexOf(' ')
+    val command = if (i == -1) tag else tag.substring(0, i)
     return when (command) {
       "INSERT" -> {
+        if (i == -1) throw RuntimeException()
         val j = tag.indexOf(' ', i + 1).apply { if (this == -1) throw RuntimeException() }
         tag.substring(j + 1).toInt()
       }
-      "DELETE", "UPDATE", "SELECT", "MOVE", "FETCH", "COPY" -> tag.substring(i + 1).toInt()
+      "DELETE", "UPDATE", "SELECT", "MOVE", "FETCH", "COPY" -> {
+        if (i == -1) throw RuntimeException()
+        tag.substring(i + 1).toInt()
+      }
       else -> 0
     }
   }
@@ -222,6 +227,10 @@ class PostgresConnection internal constructor(
 
   private suspend fun sync() {
     send(Message.Sync())
+  }
+
+  private suspend fun query(query: String) {
+    send(Message.Query(query))
   }
 
   internal suspend fun send(message: Message.FromClient) {

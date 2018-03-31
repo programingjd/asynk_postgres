@@ -151,6 +151,17 @@ sealed class Message {
     }
   }
 
+  class Query(val query: String): FromClient, Message() {
+    override fun toString() = "Query(${query})"
+    override fun writeTo(buffer: ByteBuffer) {
+      buffer.put('Q'.toByte())
+      val start = buffer.position()
+      buffer.putInt(0)
+      buffer.put(query.toByteArray(Charsets.US_ASCII))
+      buffer.putInt(start, buffer.position() - start)
+    }
+  }
+
   class Parse(private val preparedStatementName: ByteArray?,
               private val query: String): FromClient, Message() {
     override fun toString() = "Parse(${preparedStatementName?.let { String(it) } ?: "unamed"}): ${query}"
