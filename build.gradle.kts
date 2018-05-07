@@ -18,13 +18,13 @@ buildscript {
 }
 
 plugins {
-  kotlin("jvm") version "1.2.40"
+  kotlin("jvm") version "1.2.41"
   `maven-publish`
   id("com.jfrog.bintray") version "1.8.0"
 }
 
 group = "info.jdavid.postgres"
-version = "1.0.2.0"
+version = "1.0.2.1"
 
 repositories {
   jcenter()
@@ -34,7 +34,7 @@ dependencies {
   compile(kotlin("stdlib-jdk8"))
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:0.22.5")
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-nio:0.22.5")
-  implementation("info.jdavid.sql:sql:1.0.2.0")
+  implementation("info.jdavid.sql:sql:1.0.2.1")
   implementation("org.slf4j:slf4j-api:1.7.25")
   testImplementation("junit:junit:4.12")
   testImplementation("com.fasterxml.jackson.core:jackson-databind:2.9.5")
