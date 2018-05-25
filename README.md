@@ -1,5 +1,5 @@
 ![jcenter](https://img.shields.io/badge/_jcenter_-1.0.2.1-6688ff.png?style=flat) &#x2003; ![jcenter](https://img.shields.io/badge/_Tests_-27/27-green.png?style=flat)
-# postgres
+# Asynk POSTGRES
 A Postgres async client with suspend functions for kotlin coroutines.
 
 ## Download ##
