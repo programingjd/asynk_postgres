@@ -1,4 +1,4 @@
-package info.jdavid.postgres
+package info.jdavid.asynk.postgres
 
 enum class Oids(private val oid: kotlin.Int, internal val arrayOf: Oids? = null) {
 

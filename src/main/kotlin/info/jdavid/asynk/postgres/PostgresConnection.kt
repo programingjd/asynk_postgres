@@ -1,6 +1,6 @@
-package info.jdavid.postgres
+package info.jdavid.asynk.postgres
 
-import info.jdavid.sql.Connection
+import info.jdavid.asynk.sql.Connection
 import kotlinx.coroutines.experimental.channels.Channel
 import kotlinx.coroutines.experimental.channels.toList
 import kotlinx.coroutines.experimental.launch

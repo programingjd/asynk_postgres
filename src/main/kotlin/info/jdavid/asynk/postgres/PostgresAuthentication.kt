@@ -1,9 +1,9 @@
-package info.jdavid.postgres
+package info.jdavid.asynk.postgres
 
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.SocketAddress
-typealias PostgresCredentials=info.jdavid.sql.Credentials<PostgresConnection>
+typealias PostgresCredentials=info.jdavid.asynk.sql.Credentials<PostgresConnection>
 
 object PostgresAuthentication {
 

@@ -1,4 +1,4 @@
-package info.jdavid.postgres
+package info.jdavid.asynk.postgres
 
 import java.io.File
 import java.util.*

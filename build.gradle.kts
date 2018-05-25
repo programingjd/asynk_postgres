@@ -23,18 +23,19 @@ plugins {
   id("com.jfrog.bintray") version "1.8.0"
 }
 
-group = "info.jdavid.postgres"
-version = "1.0.2.1"
+group = "info.jdavid.asynk"
+version = "0.0.0.1"
 
 repositories {
   jcenter()
+  maven("http://dl.bintray.com/programingjd/maven")
 }
 
 dependencies {
   compile(kotlin("stdlib-jdk8"))
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:0.22.5")
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-nio:0.22.5")
-  implementation("info.jdavid.sql:sql:1.0.2.1")
+  implementation("info.jdavid.asynk:sql:0.0.0.1")
   implementation("org.slf4j:slf4j-api:1.7.25")
   testImplementation("junit:junit:4.12")
   testImplementation("com.fasterxml.jackson.core:jackson-databind:2.9.5")
@@ -97,14 +98,14 @@ bintray {
   setPublications("mavenJava")
   pkg(delegateClosureOf<BintrayExtension.PackageConfig>{
     repo = "maven"
-    name = "${project.group}"
-    websiteUrl = "https://github.com/programingjd/postgres"
-    issueTrackerUrl = "https://github.com/programingjd/postgres/issues"
-    vcsUrl = "https://github.com/programingjd/postgres.git"
-    githubRepo = "programingjd/postgres"
+    name = "${project.group}.${project.name}"
+    websiteUrl = "https://github.com/programingjd/asynk_postgres"
+    issueTrackerUrl = "https://github.com/programingjd/asynk_postgres/issues"
+    vcsUrl = "https://github.com/programingjd/asynk_postgres.git"
+    githubRepo = "programingjd/asynk_postgres"
     githubReleaseNotesFile = "README.md"
     setLicenses("Apache-2.0")
-    setLabels("postgres", "postgresql", "sql", "java", "kotlin", "async", "coroutines")
+    setLabels("asynk", "postgres", "postgresql", "sql", "java", "kotlin", "async", "coroutines")
     publicDownloadNumbers = true
     version(delegateClosureOf<BintrayExtension.VersionConfig> {
       name = "${project.version}"
@@ -139,9 +140,9 @@ tasks {
               when (i) {
                 0 -> "![jcenter](${badge("jcenter", "${project.version}", "6688ff")}) &#x2003; " +
                      "![jcenter](${badge("Tests", "${total-failed}/${total}", color)})"
-                9 -> "[Download](https://bintray.com/artifact/download/programingjd/maven/info/jdavid/postgres/postgres/${project.version}/postgres-${project.version}.jar) the latest jar."
+                9 -> "[Download](https://bintray.com/artifact/download/programingjd/maven/info/jdavid/asynk/postgres/${project.version}/postgres-${project.version}.jar) the latest jar."
                 19 -> "  <version>${project.version}</version>"
-                32 -> "  compile 'info.jdavid.postgres:postgres:${project.version}'"
+                32 -> "  compile 'info.jdavid.asynk:postgres:${project.version}'"
                 else -> line
               }
             }.joinToString("\n").let {
@@ -156,6 +157,6 @@ tasks {
     }
   }
   "bintrayUpload" {
-    dependsOn("check")
+    //dependsOn("check")
   }
 }

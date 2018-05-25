@@ -1,4 +1,4 @@
-package info.jdavid.postgres
+package info.jdavid.asynk.postgres
 
 import java.nio.ByteBuffer
 import java.security.MessageDigest

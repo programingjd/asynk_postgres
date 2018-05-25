@@ -1,4 +1,4 @@
-package info.jdavid.postgres
+package info.jdavid.asynk.postgres
 
 import java.math.BigInteger
 import java.time.Instant

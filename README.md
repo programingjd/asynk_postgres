@@ -4,8 +4,8 @@ A Postgres async client with suspend functions for kotlin coroutines.
 
 ## Download ##
 
-The maven artifacts are on [Bintray](https://bintray.com/programingjd/maven/info.jdavid.postgres/view)
-and [jcenter](https://bintray.com/search?query=info.jdavid.postgres).
+The maven artifacts are on [Bintray](https://bintray.com/programingjd/maven/info.jdavid.asynk.postgres/view)
+and [jcenter](https://bintray.com/search?query=info.jdavid.asynk.postgres).
 
 [Download](https://bintray.com/artifact/download/programingjd/maven/info/jdavid/postgres/postgres/1.0.2.1/postgres-1.0.2.1.jar) the latest jar.
 
@@ -15,7 +15,7 @@ Include [those settings](https://bintray.com/repo/downloadMavenRepoSettingsFile/
  to be able to resolve jcenter artifacts.
 ```
 <dependency>
-  <groupId>info.jdavid.postgres</groupId>
+  <groupId>info.jdavid.asynk</groupId>
   <artifactId>postgres</artifactId>
   <version>1.0.2.1</version>
 </dependency>
@@ -30,6 +30,6 @@ repositories {
 ```
 ```
 dependencies {
-  compile 'info.jdavid.postgres:postgres:1.0.2.1'
+  compile 'info.jdavid.asynk.postgres:postgres:1.0.2.1'
 }
 ```

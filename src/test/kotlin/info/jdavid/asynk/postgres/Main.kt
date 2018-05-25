@@ -1,9 +1,8 @@
-package info.jdavid.postgres
+package info.jdavid.asynk.postgres
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
-import info.jdavid.sql.use
-import kotlinx.coroutines.experimental.delay
+import info.jdavid.asynk.sql.use
 import kotlinx.coroutines.experimental.runBlocking
 
 fun json(any: Any?) = ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT).writeValueAsString(any)

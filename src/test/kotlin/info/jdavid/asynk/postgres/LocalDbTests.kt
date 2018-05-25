@@ -1,6 +1,6 @@
-package info.jdavid.postgres
+package info.jdavid.asynk.postgres
 
-import info.jdavid.sql.use
+import info.jdavid.asynk.sql.use
 import kotlinx.coroutines.experimental.runBlocking
 import org.junit.Test
 import org.junit.Assert.*

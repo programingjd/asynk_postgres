@@ -1,6 +1,6 @@
-package info.jdavid.postgres
+package info.jdavid.asynk.postgres
 
-import info.jdavid.sql.use
+import info.jdavid.asynk.sql.use
 import kotlinx.coroutines.experimental.runBlocking
 import org.junit.After
 import org.junit.Assert
@@ -18,6 +18,13 @@ class WorldTests {
     val password = properties.getProperty("postgres_password") ?: "postgres"
     credentials = PostgresAuthentication.Credentials.PasswordCredentials(username, password)
     databaseName = properties.getProperty("postgres_database") ?: "postgres"
+  }
+
+  companion object {
+    @JvmStatic
+    fun main(args: Array<String>) {
+      WorldTests().createTables()
+    }
   }
 
   @Before
