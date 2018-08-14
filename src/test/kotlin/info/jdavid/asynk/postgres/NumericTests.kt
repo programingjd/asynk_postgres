@@ -1,7 +1,7 @@
 package info.jdavid.asynk.postgres
 
-import org.junit.Test
-import org.junit.Assert.*
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.Assertions.*
 import java.math.BigDecimal
 import java.math.RoundingMode
 

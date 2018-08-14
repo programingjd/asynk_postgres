@@ -2,24 +2,55 @@ package info.jdavid.asynk.postgres
 
 import info.jdavid.asynk.sql.use
 import kotlinx.coroutines.experimental.runBlocking
-import org.junit.Test
-import org.junit.Assert.*
+import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.EnumSource
+import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 class LocalDbTests {
   private val credentials: PostgresAuthentication.Credentials
   private val databaseName: String
   init {
-    val properties = Utils.properties()
-    val username = properties.getProperty("postgres_username") ?: "postgres"
-    val password = properties.getProperty("postgres_password") ?: "postgres"
-    credentials = PostgresAuthentication.Credentials.PasswordCredentials(username, password)
-    databaseName = properties.getProperty("postgres_database") ?: "postgres"
+    credentials = PostgresAuthentication.Credentials.PasswordCredentials("test", "asynk")
+    databaseName = "world"
   }
 
-  @Test
-  fun testSimple() {
+  companion object {
+    @JvmStatic @BeforeAll
+    fun startDockerContainers() {
+      Executors.newCachedThreadPool().apply {
+        Docker.DatabaseVersion.values().forEach {
+          submit {
+            Docker.startContainer(it)
+          }
+        }
+        shutdown()
+      }.awaitTermination(300, TimeUnit.SECONDS)
+    }
+    @JvmStatic @AfterAll
+    fun stopDockerContainers() {
+      Executors.newCachedThreadPool().apply {
+        Docker.DatabaseVersion.values().forEach {
+          submit {
+            Docker.stopContainer(it)
+          }
+        }
+        shutdown()
+      }.awaitTermination(15, TimeUnit.SECONDS)
+    }
+  }
+
+  @ParameterizedTest(name = "{index} => {0}")
+  @EnumSource(value = Docker.DatabaseVersion::class)
+  fun testSimple(databaseVersion: Docker.DatabaseVersion) {
     runBlocking {
-      credentials.connectTo(databaseName).use {
+      val address = InetSocketAddress(InetAddress.getLocalHost(), databaseVersion.port)
+      credentials.connectTo(databaseName, address).use {
         assertEquals(0, it.affectedRows(
           """
             CREATE TEMPORARY TABLE test (
@@ -115,10 +146,12 @@ class LocalDbTests {
     }
   }
 
-  @Test
-  fun testPreparedStatement() {
+  @ParameterizedTest(name = "{index} => {0}")
+  @EnumSource(value = Docker.DatabaseVersion::class)
+  fun testPreparedStatement(databaseVersion: Docker.DatabaseVersion) {
     runBlocking {
-      credentials.connectTo(databaseName).use {
+      val address = InetSocketAddress(InetAddress.getLocalHost(), databaseVersion.port)
+      credentials.connectTo(databaseName, address).use {
         assertEquals(0, it.affectedRows(
           """
             CREATE TEMPORARY TABLE test (
@@ -137,7 +170,7 @@ class LocalDbTests {
           assertEquals(1, affectedRows(listOf("Name2")))
           assertEquals(1, affectedRows(listOf("Name3")))
           assertEquals(1, affectedRows(listOf("Name4")))
-          aClose()
+          this.aClose()
           try {
             affectedRows(listOf("Name5"))
             fail("Execution of closed prepared statement should have failed.")
@@ -152,7 +185,7 @@ class LocalDbTests {
           assertEquals(3, rows(listOf(false)).toList().size)
           assertEquals(1, it.affectedRows("UPDATE test SET active=TRUE WHERE name=?", listOf("Name1")))
           assertEquals(2, rows(listOf(false)).toList().size)
-          aClose()
+          this.aClose()
           try {
             rows(listOf(false))
             fail("Execution of closed prepared statement should have failed.")
@@ -163,10 +196,12 @@ class LocalDbTests {
     }
   }
 
-  @Test
-  fun testNull() {
+  @ParameterizedTest(name = "{index} => {0}")
+  @EnumSource(value = Docker.DatabaseVersion::class)
+  fun testNull(databaseVersion: Docker.DatabaseVersion) {
     runBlocking {
-      credentials.connectTo(databaseName).use {
+      val address = InetSocketAddress(InetAddress.getLocalHost(), databaseVersion.port)
+      credentials.connectTo(databaseName, address).use {
         assertEquals(0, it.affectedRows(
           """
             CREATE TEMPORARY TABLE test (
@@ -215,10 +250,12 @@ class LocalDbTests {
     }
   }
 
-  @Test
-  fun testStrings() {
+  @ParameterizedTest(name = "{index} => {0}")
+  @EnumSource(value = Docker.DatabaseVersion::class)
+  fun testStrings(databaseVersion: Docker.DatabaseVersion) {
     runBlocking {
-      credentials.connectTo(databaseName).use {
+      val address = InetSocketAddress(InetAddress.getLocalHost(), databaseVersion.port)
+      credentials.connectTo(databaseName, address).use {
         assertEquals(0, it.affectedRows(
           """
             CREATE TEMPORARY TABLE test (
@@ -259,10 +296,12 @@ class LocalDbTests {
     }
   }
 
-  @Test
-  fun testBytes() {
+  @ParameterizedTest(name = "{index} => {0}")
+  @EnumSource(value = Docker.DatabaseVersion::class)
+  fun testBytes(databaseVersion: Docker.DatabaseVersion) {
     runBlocking {
-      credentials.connectTo(databaseName).use {
+      val address = InetSocketAddress(InetAddress.getLocalHost(), databaseVersion.port)
+      credentials.connectTo(databaseName, address).use {
         assertEquals(0, it.affectedRows(
           """
             CREATE TEMPORARY TABLE test (
@@ -294,10 +333,12 @@ class LocalDbTests {
     }
   }
 
-  @Test
-  fun testArrays() {
+  @ParameterizedTest(name = "{index} => {0}")
+  @EnumSource(value = Docker.DatabaseVersion::class)
+  fun testArrays(databaseVersion: Docker.DatabaseVersion) {
     runBlocking {
-      credentials.connectTo(databaseName).use {
+      val address = InetSocketAddress(InetAddress.getLocalHost(), databaseVersion.port)
+      credentials.connectTo(databaseName, address).use {
         assertEquals(0, it.affectedRows(
           """
             CREATE TEMPORARY TABLE test (
@@ -345,10 +386,12 @@ class LocalDbTests {
     }
   }
 
-  @Test
-  fun testTransactions() {
+  @ParameterizedTest(name = "{index} => {0}")
+  @EnumSource(value = Docker.DatabaseVersion::class)
+  fun testTransactions(databaseVersion: Docker.DatabaseVersion) {
     runBlocking {
-      credentials.connectTo(databaseName).use {
+      val address = InetSocketAddress(InetAddress.getLocalHost(), databaseVersion.port)
+      credentials.connectTo(databaseName, address).use {
         assertEquals(0, it.affectedRows(
           """
             CREATE TEMPORARY TABLE test (
@@ -396,6 +439,40 @@ class LocalDbTests {
     }
   }
 
+  @ParameterizedTest(name = "{index} => {0}")
+  @EnumSource(value = Docker.DatabaseVersion::class)
+  fun testWorldData(databaseVersion: Docker.DatabaseVersion) {
+    runBlocking {
+      val address = InetSocketAddress(InetAddress.getLocalHost(), databaseVersion.port)
+      credentials.connectTo(databaseName, address).use { connection ->
+        assertEquals(
+          239L,
+          connection.rows("SELECT count(*) AS count FROM country").toList().first()["count"]
+        )
+        val codes = connection.rows(
+          "SELECT DISTINCT CountryCode AS code FROM city"
+        ).toList().map { it["code"] }
+        assertEquals(232, codes.size)
+        assertTrue(codes.contains("FRA"))
+        assertEquals(codes.toSet().size, codes.size)
+        val all = connection.rows(
+          "SELECT Code AS code FROM country"
+        ).toList().map { it["code"] }.toSet()
+        assertEquals(239, all.size)
+        assertEquals(all.toSet().size, all.size)
+        assertTrue(all.containsAll(codes))
+
+        val cities = connection.rows(
+          "SELECT Name AS city FROM city WHERE CountryCode=? ORDER BY Population DESC",
+          listOf("FRA")
+        ).toList().map { it["city"] }
+        assertEquals(40, cities.size)
+        assertEquals("Paris", cities[0])
+        assertEquals("Marseille", cities[1])
+        assertEquals("Lyon", cities[2])
+      }
+    }
+  }
 
   private class RollbackException: RuntimeException()
 
