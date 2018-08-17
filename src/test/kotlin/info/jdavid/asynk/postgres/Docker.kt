@@ -29,7 +29,7 @@ object Docker {
     POSTGRES_94("library/postgres:9.4", 5434),
     POSTGRES_95("library/postgres:9.5", 5435),
     POSTGRES_96("library/postgres:9.6", 5436),
-    POSTGRES_105("library/postgres:10.5", 5437),
+    POSTGRES_105("library/postgres:10.5", 5437)
   }
 
   fun check() {
@@ -181,7 +181,7 @@ object Docker {
   @JvmStatic
   fun main(args: Array<String>) {
     check()
-    DatabaseVersion.POSTGRES_96.let { version ->
+    DatabaseVersion.values().last().let { version ->
       startContainer(version)
       try {
         createWorldDatabase(version)

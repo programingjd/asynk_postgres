@@ -177,21 +177,26 @@ class LocalDbTests {
           }
           catch (ignore: Exception) {}
         }
-        it.prepare("SELECT * FROM test WHERE active=?").apply {
-          assertNotNull(name)
-          assertEquals(4, rows(listOf(false)).toList().size)
-          assertEquals(0, rows(listOf(true)).toList().size)
-          assertEquals(1, it.affectedRows("DELETE FROM test WHERE name=?", listOf("Name4")))
-          assertEquals(3, rows(listOf(false)).toList().size)
-          assertEquals(1, it.affectedRows("UPDATE test SET active=TRUE WHERE name=?", listOf("Name1")))
-          assertEquals(2, rows(listOf(false)).toList().size)
-          this.aClose()
-          try {
-            rows(listOf(false))
-            fail("Execution of closed prepared statement should have failed.")
-          }
-          catch (ignore: Exception) {}
+        val s1 = it.prepare("SELECT * FROM test WHERE active=?")
+        assertNotNull(s1.name)
+        assertEquals(4, s1.rows(listOf(false)).toList().size)
+        assertEquals(0, s1.rows(listOf(true)).toList().size)
+        val s2 = it.prepare("SELECT * FROM test WHERE name=?")
+        assertNotNull(s2.name)
+        assertEquals(1, s2.rows(listOf("Name4")).toList().size)
+        assertEquals(1, it.affectedRows("DELETE FROM test WHERE name=?", listOf("Name4")))
+        assertEquals(3, s1.rows(listOf(false)).toList().size)
+        assertEquals(0, s2.rows(listOf("Name4")).toList().size)
+        assertEquals(1, it.affectedRows("UPDATE test SET active=TRUE WHERE name=?", listOf("Name1")))
+        assertEquals(2, s1.rows(listOf(false)).toList().size)
+        s1.aClose()
+        assertEquals(1, s2.rows(listOf("Name1")).toList().size)
+        try {
+          s1.rows(listOf(false))
+          fail<Nothing>("Execution of closed prepared statement should have failed.")
         }
+        catch (ignore: Exception) {}
+        s2.aClose()
       }
     }
   }

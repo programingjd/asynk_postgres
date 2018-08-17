@@ -180,11 +180,12 @@ class PostgresConnection internal constructor(
   }
 
   suspend fun close(preparedStatement: PostgresPreparedStatement) {
+    println("closing ${preparedStatement.name?.let { String(it) }}")
     send(Message.ClosePreparedStatement(preparedStatement.name))
     if (preparedStatement.name != null) {
-      send(Message.Flush())
+      sync()
       val messages = receive()
-      messages.find { it is Message.CloseComplete } ?: throw RuntimeException()
+      messages.find { it is Message.CloseComplete || it is Message.ReadyForQuery } ?: throw RuntimeException()
     }
   }
 
@@ -201,8 +202,14 @@ class PostgresConnection internal constructor(
     if (name != null) {
       send(Message.Flush())
       val messages = receive()
-      messages.find { it is Message.ParseComplete } ?:
-        throw RuntimeException("Failed to parse statement:\n${sqlStatement}")
+      if (messages.find { it is Message.ParseComplete } == null) {
+        if (messages.find { it is Message.ReadyForQuery } == null) {
+          throw RuntimeException("Failed to parse statement:\n${sqlStatement}")
+        }
+        send(Message.Flush())
+        receive().find { it is Message.ParseComplete }  ?:
+          throw RuntimeException("Failed to parse statement:\n${sqlStatement}")
+      }
     }
     return preparedStatement
   }
