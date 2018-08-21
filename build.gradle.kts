@@ -18,13 +18,13 @@ buildscript {
 }
 
 plugins {
-  kotlin("jvm") version "1.2.60"
+  kotlin("jvm") version "1.2.61"
   `maven-publish`
   id("com.jfrog.bintray") version "1.8.1"
 }
 
 group = "info.jdavid.asynk"
-version = "0.0.0.5"
+version = "0.0.0.6"
 
 repositories {
   jcenter()
@@ -35,7 +35,7 @@ dependencies {
   compile(kotlin("stdlib-jdk8"))
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:0.24.0")
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-nio:0.24.0")
-  implementation("info.jdavid.asynk:sql:0.0.0.4")
+  implementation("info.jdavid.asynk:sql:0.0.0.6")
   implementation("org.slf4j:slf4j-api:1.7.25")
   testImplementation("org.junit.jupiter:junit-jupiter-api:5.2.0")
   testImplementation("org.junit.jupiter:junit-jupiter-params:5.2.0")
@@ -167,6 +167,6 @@ tasks {
     }
   }
   "bintrayUpload" {
-    //dependsOn("check")
+    dependsOn("check")
   }
 }

@@ -57,7 +57,7 @@ object Docker {
       it.execute(HttpPost(
         "${dockerApiUrl}/images/create?fromImage=${databaseVersion.label}"
       )).use {
-        println(String(it.entity.content.readAllBytes()))
+        println(String(it.entity.content.readBytes()))
       }
       it.execute(HttpPost(
         "${dockerApiUrl}/containers/create?name=async_${databaseVersion.name.toLowerCase()}"
@@ -88,20 +88,20 @@ object Docker {
         )
         entity = ByteArrayEntity(ObjectMapper().writeValueAsBytes(body), ContentType.APPLICATION_JSON)
       }).use {
-        println(String(it.entity.content.readAllBytes()))
+        println(String(it.entity.content.readBytes()))
       }
 
       it.execute(HttpPost(
         "${dockerApiUrl}/containers/async_${databaseVersion.name.toLowerCase()}/start"
       )).use {
         if (it.statusLine.statusCode != 204 && it.statusLine.statusCode != 304)
-          throw RuntimeException(String(it.entity.content.readAllBytes()))
+          throw RuntimeException(String(it.entity.content.readBytes()))
       }
 
       val id = it.execute(HttpGet(
         "${dockerApiUrl}/containers/json?name=async_${databaseVersion.name.toLowerCase()}"
       )).use {
-        val list = ObjectMapper().readValue(it.entity.content.readAllBytes(), ArrayList::class.java)
+        val list = ObjectMapper().readValue(it.entity.content.readBytes(), ArrayList::class.java)
         if (list.isEmpty()) throw RuntimeException("Failed to create container.")
         @Suppress("UNCHECKED_CAST")
         (list[0] as Map<String, Any?>)["Id"] as String
@@ -114,7 +114,7 @@ object Docker {
         val list = it.execute(HttpGet(
           "${dockerApiUrl}/containers/json?filters=${URLEncoder.encode(filters,"UTF-8")}"
         )).use {
-          ObjectMapper().readValue(it.entity.content.readAllBytes(), ArrayList::class.java)
+          ObjectMapper().readValue(it.entity.content.readBytes(), ArrayList::class.java)
         }
 //        val found = list.find {
 //          @Suppress("UNCHECKED_CAST")
@@ -138,7 +138,7 @@ object Docker {
         "${dockerApiUrl}/containers/async_${databaseVersion.name.toLowerCase()}/stop"
       )).use {
         if (it.statusLine.statusCode != 204 && it.statusLine.statusCode != 304)
-          throw RuntimeException(String(it.entity.content.readAllBytes()))
+          throw RuntimeException(String(it.entity.content.readBytes()))
       }
     }
     HttpClients.createMinimal().let {
@@ -146,7 +146,7 @@ object Docker {
         "${dockerApiUrl}/containers/async_${databaseVersion.name.toLowerCase()}"
       )).use {
         if (it.statusLine.statusCode != 204 && it.statusLine.statusCode != 404)
-          throw RuntimeException(String(it.entity.content.readAllBytes()))
+          throw RuntimeException(String(it.entity.content.readBytes()))
       }
     }
   }
@@ -163,17 +163,17 @@ object Docker {
         )
         entity = ByteArrayEntity(ObjectMapper().writeValueAsBytes(body), ContentType.APPLICATION_JSON)
       }).use {
-        ObjectMapper().readTree(it.entity.content.readAllBytes()).findValue("Id").asText()
+        ObjectMapper().readTree(it.entity.content.readBytes()).findValue("Id").asText()
       }
       it.execute(HttpPost(
         "${dockerApiUrl}/exec/${id}/start"
       )).use {
-        println(String(it.entity.content.readAllBytes()))
+        println(String(it.entity.content.readBytes()))
       }
       it.execute(HttpGet(
         "${dockerApiUrl}/exec/${id}/json"
       )).use {
-        println(String(it.entity.content.readAllBytes()))
+        println(String(it.entity.content.readBytes()))
       }
     }
   }
