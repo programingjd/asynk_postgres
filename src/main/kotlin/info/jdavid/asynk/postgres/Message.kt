@@ -4,7 +4,7 @@ import java.nio.ByteBuffer
 import java.security.MessageDigest
 import java.util.Date
 
-sealed class Message {
+internal sealed class Message {
 
   interface Authentication
 

@@ -1,6 +1,6 @@
 package info.jdavid.asynk.postgres
 
-enum class Oids(private val oid: kotlin.Int, internal val arrayOf: Oids? = null) {
+internal enum class Oids(private val oid: kotlin.Int, internal val arrayOf: Oids? = null) {
 
   Char(18),
   CharArray(1002, Char),

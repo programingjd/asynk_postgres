@@ -20,6 +20,9 @@ import kotlin.coroutines.experimental.coroutineContext
 
 typealias PreparedStatement=Connection.PreparedStatement<PostgresConnection>
 
+/**
+ * PostgreSQL database connection.
+ */
 class PostgresConnection internal constructor(
                          private val channel: AsynchronousSocketChannel,
                          private val buffer: ByteBuffer): Connection<PostgresConnection> {
@@ -302,6 +305,13 @@ class PostgresConnection internal constructor(
   }
 
   companion object {
+    /**
+     * Connects to a PostgreSQL database using the supplied credentials.
+     * @param database the database name.
+     * @param credentials the credentials to use for the connection (defaults to postgres unsecured credentials).
+     * @param address the server address and port (localhost:5432 by default).
+     * @param bufferSize the buffer size (4MB by default).
+     */
     suspend fun to(
       database: String,
       credentials: PostgresAuthentication.Credentials =
