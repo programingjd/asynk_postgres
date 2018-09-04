@@ -127,7 +127,7 @@ bintray {
     githubRepo = "programingjd/asynk_postgres"
     githubReleaseNotesFile = "README.md"
     setLicenses("Apache-2.0")
-    setLabels("asynk", "postgres", "postgresql", "sql", "java", "kotlin", "async", "coroutines")
+    setLabels("asynk", "postgres", "postgresql", "sql", "java", "kotlin", "async", "coroutines", "suspend")
     publicDownloadNumbers = true
     version(delegateClosureOf<BintrayExtension.VersionConfig> {
       name = "${project.version}"
