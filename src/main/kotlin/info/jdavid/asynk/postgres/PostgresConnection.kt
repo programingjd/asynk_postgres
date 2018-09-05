@@ -245,7 +245,9 @@ class PostgresConnection internal constructor(
 
   internal suspend fun send(message: Message.FromClient) {
     message.writeTo(buffer.clear() as ByteBuffer)
-    channel.aWrite(buffer.flip() as ByteBuffer, 5000L, TimeUnit.MILLISECONDS)
+    (buffer.flip() as ByteBuffer).apply {
+      while (remaining() > 0) channel.aWrite(this, 5000L, TimeUnit.MILLISECONDS)
+    }
   }
 
   internal suspend fun receive(): List<Message.FromServer> {
