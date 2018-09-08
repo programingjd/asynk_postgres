@@ -8,25 +8,25 @@ typealias PostgresCredentials=info.jdavid.asynk.sql.Credentials<PostgresConnecti
 object PostgresAuthentication {
 
   internal suspend fun authenticate(connection: PostgresConnection,
-                                    credentials: PostgresCredentials): List<Message.FromServer> {
-    val messages = connection.receive()
-    val authenticationMessage = messages.find { it is Message.Authentication } ?:
-                                throw RuntimeException("Expected authentication message.")
-    when (authenticationMessage) {
-      is Message.AuthenticationOk -> return messages
+                                    credentials: PostgresCredentials) {
+    val message = connection.message()
+    if (message is Message.ErrorResponse) throw RuntimeException(message.toString())
+    if (message !is Message.Authentication) throw RuntimeException("Expected authentication message.")
+    when (message) {
+      is Message.AuthenticationOk -> Unit
       is Message.AuthenticationCleartextPassword -> {
         if (credentials !is Credentials.PasswordCredentials) throw Exception("Incompatible credentials.")
         connection.send(
-          Message.PasswordMessage(credentials.username, credentials.password, authenticationMessage)
+          Message.PasswordMessage(credentials.username, credentials.password, message)
         )
-        return authenticate(connection, credentials)
+        authenticate(connection, credentials)
       }
       is Message.AuthenticationMD5Password -> {
         if (credentials !is Credentials.PasswordCredentials) throw Exception("Incompatible credentials.")
         connection.send(
-          Message.PasswordMessage(credentials.username, credentials.password, authenticationMessage)
+          Message.PasswordMessage(credentials.username, credentials.password, message)
         )
-        return authenticate(connection, credentials)
+        authenticate(connection, credentials)
       }
       else -> throw Exception("Unsupported authentication method.")
     }

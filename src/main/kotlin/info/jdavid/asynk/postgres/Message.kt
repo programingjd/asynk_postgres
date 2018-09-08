@@ -115,6 +115,10 @@ internal sealed class Message {
     override fun toString() = "DataRow(${values.joinToString { ", " }})"
   }
 
+  class NotificationResponse(private val channel: String, private val message: String): FromServer, Message() {
+    override fun toString() = "NotificationResponse(){\n${channel}:${message}}"
+  }
+
   class NoticeResponse(private val message: String): FromServer, Message() {
     override fun toString() = "NoticeResponse(){\n${message}}"
   }
@@ -302,11 +306,15 @@ internal sealed class Message {
 
   companion object {
     @Suppress("UsePropertyAccessSyntax")
-    internal fun fromBytes(buffer: ByteBuffer): Message.FromServer {
+    internal fun fromBytes(buffer: ByteBuffer): Message.FromServer? {
       val first = buffer.get()
+      val length = buffer.getInt()
+      if (length > buffer.remaining() + 4) {
+        buffer.position(buffer.position() - 5)
+        return null
+      }
       when (first) {
         'R'.toByte() -> { // authentication
-          val length = buffer.getInt()
           val flag = buffer.getInt()
           when (flag) {
             0 -> {
@@ -349,7 +357,6 @@ internal sealed class Message {
           }
         }
         'S'.toByte() -> {
-          val length = buffer.getInt()
           val data = ByteArray(length - 4)
           buffer.get(data)
           val i = data.indexOf(0)
@@ -358,45 +365,37 @@ internal sealed class Message {
           return ParameterStatus(key, value)
         }
         'K'.toByte() -> {
-          val length = buffer.getInt()
           assert(length == 12)
           val processId = buffer.getInt()
           val secretKey = buffer.getInt()
           return BackendKeyData(processId, secretKey)
         }
         'Z'.toByte() -> {
-          val length = buffer.getInt()
           assert(length == 5)
           val status = ReadyForQuery.Status.from(buffer.get())
           return ReadyForQuery(status)
         }
         '1'.toByte() -> {
-          val length = buffer.getInt()
           assert(length == 4)
           return ParseComplete()
         }
         '2'.toByte() -> {
-          val length = buffer.getInt()
           assert(length == 4)
           return BindComplete()
         }
         '3'.toByte() -> {
-          val length = buffer.getInt()
           assert(length == 4)
           return CloseComplete()
         }
         'n'.toByte() -> {
-          val length = buffer.getInt()
           assert(length == 4)
           return NoData()
         }
         's'.toByte() -> {
-          val length = buffer.getInt()
           assert(length == 4)
           return PortalSuspended()
         }
         'T'.toByte() -> {
-          val length = buffer.getInt()
           assert(length >= 6)
           val n = buffer.getShort()
           val fields = (1..n).map {
@@ -418,7 +417,6 @@ internal sealed class Message {
           return RowDescription(fields)
         }
         'C'.toByte() -> {
-          val length = buffer.getInt()
           val data = ByteArray(length - 5)
           buffer.get(data)
           val tag = String(data, Charsets.US_ASCII)
@@ -427,7 +425,6 @@ internal sealed class Message {
           return CommandComplete(tag)
         }
         'D'.toByte() -> {
-          val length = buffer.getInt()
           val n = buffer.getShort()
           val data = ByteArray(length - 6 - n * 4)
           val list = ArrayList<String?>(n.toInt())
@@ -444,7 +441,6 @@ internal sealed class Message {
           return DataRow(list)
         }
         'N'.toByte(), 'E'.toByte() -> {
-          val length = buffer.getInt()
           val data = ByteArray(length - 4)
           buffer.get(data)
           val message = StringBuilder()
@@ -484,6 +480,25 @@ internal sealed class Message {
           return message.toString().let {
             if (first == 'E'.toByte()) ErrorResponse(it) else NoticeResponse(it)
           }
+        }
+        'A'.toByte() -> {
+          assert(length > 8)
+          /*val processId =*/ buffer.getInt()
+          val sb = StringBuilder()
+          while (true) {
+            val b = buffer.get()
+            if (b == 0.toByte()) break
+            sb.appendCodePoint(b.toInt())
+          }
+          val channel = sb.toString()
+          sb.setLength(0)
+          while (true) {
+            val b = buffer.get()
+            if (b == 0.toByte()) break
+            sb.appendCodePoint(b.toInt())
+          }
+          val payload = sb.toString()
+          return NotificationResponse(channel, payload)
         }
         else -> throw IllegalArgumentException("${first.toChar()}")
       }
