@@ -26,7 +26,7 @@ plugins {
 }
 
 group = "info.jdavid.asynk"
-version = "0.0.0.11"
+version = "0.0.0.12"
 
 repositories {
   jcenter()
@@ -37,13 +37,13 @@ dependencies {
   compile(kotlin("stdlib-jdk8"))
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:0.25.3")
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-nio:0.25.3")
-  implementation("info.jdavid.asynk:sql:0.0.0.11")
+  implementation("info.jdavid.asynk:sql:0.0.0.12")
   implementation("org.slf4j:slf4j-api:1.7.25")
-  testImplementation("org.junit.jupiter:junit-jupiter-api:5.2.0")
-  testImplementation("org.junit.jupiter:junit-jupiter-params:5.2.0")
-  testRuntime("org.junit.jupiter:junit-jupiter-engine:5.2.0")
+  testImplementation("org.junit.jupiter:junit-jupiter-api:5.3.0")
+  testImplementation("org.junit.jupiter:junit-jupiter-params:5.3.0")
+  testRuntime("org.junit.jupiter:junit-jupiter-engine:5.3.0")
   testImplementation("com.fasterxml.jackson.core:jackson-databind:2.9.6")
-  testImplementation("org.apache.httpcomponents:httpclient:4.5.5")
+  testImplementation("org.apache.httpcomponents:httpclient:4.5.6")
   testRuntime("org.slf4j:slf4j-jdk14:1.7.25")
 }
 
