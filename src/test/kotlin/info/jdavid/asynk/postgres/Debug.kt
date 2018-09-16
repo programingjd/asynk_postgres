@@ -1,10 +1,8 @@
 package info.jdavid.asynk.postgres
 
 import info.jdavid.asynk.sql.use
-import kotlinx.coroutines.experimental.CommonPool
-import kotlinx.coroutines.experimental.async
+import kotlinx.coroutines.experimental.launch
 import kotlinx.coroutines.experimental.runBlocking
-import kotlinx.coroutines.experimental.withContext
 import java.net.InetAddress
 import java.net.InetSocketAddress
 
@@ -20,11 +18,11 @@ class Debug {
         Docker.startContainer(version)
         try {
           runBlocking {
-            withContext(CommonPool) {
+            launch {
               val address = InetSocketAddress(InetAddress.getLocalHost(), version.port)
-              credentials.connectTo(databaseName, address).use {
+              credentials.connectTo(databaseName, address).use { connection ->
                 println("connected")
-                println(it.affectedRows(
+                println(connection.affectedRows(
                   """
                     CREATE TEMPORARY TABLE test (
                       id             serial    PRIMARY KEY,
@@ -34,24 +32,24 @@ class Debug {
                     )
                   """.trimIndent()
                 ))
-                println(it.rows("INSERT INTO test (name) VALUES (?)", listOf("row1")).toList())
-                println(it.affectedRows("DELETE FROM test WHERE true"))
-                it.prepare("INSERT INTO test (name) VALUES (?)", "i1").use {
+                println(connection.rows("INSERT INTO test (name) VALUES (?)", listOf("row1")).toList())
+                println(connection.affectedRows("DELETE FROM test WHERE true"))
+                connection.prepare("INSERT INTO test (name) VALUES (?)", "i1").use {
                   println(it.rows(listOf("row1")).toList())
                 }
-                println(it.affectedRows("INSERT INTO test (name) VALUES (?)", listOf("row2")))
-                it.prepare("INSERT INTO test (name) VALUES (?)", "i1").use {
+                println(connection.affectedRows("INSERT INTO test (name) VALUES (?)", listOf("row2")))
+                connection.prepare("INSERT INTO test (name) VALUES (?)", "i1").use {
                   println(it.affectedRows(listOf("row3")))
                   println(it.affectedRows(listOf("row4")))
                 }
-                println(it.rows("SELECT * FROM test WHERE id=1234").toList())
-                println(it.rows("SELECT * FROM test").toList())
+                println(connection.rows("SELECT * FROM test WHERE id=1234").toList())
+                println(connection.rows("SELECT * FROM test").toList())
               }
             }
           }
         }
         finally {
-//          Docker.stopContainer(version)
+          Docker.stopContainer(version)
         }
       }
     }
