@@ -27,7 +27,7 @@ plugins {
 }
 
 group = "info.jdavid.asynk"
-version = "0.0.0.13"
+version = "0.0.0.14"
 
 repositories {
   jcenter()
@@ -36,9 +36,9 @@ repositories {
 
 dependencies {
   compile(kotlin("stdlib-jdk8"))
-  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:0.26.0")
-  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-nio:0.26.0")
-  implementation("info.jdavid.asynk:sql:0.0.0.13")
+  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:0.26.1")
+  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-nio:0.26.1")
+  implementation("info.jdavid.asynk:sql:0.0.0.14")
   implementation("org.slf4j:slf4j-api:1.7.25")
   testImplementation("org.junit.jupiter:junit-jupiter-api:5.3.0")
   testImplementation("org.junit.jupiter:junit-jupiter-params:5.3.0")
