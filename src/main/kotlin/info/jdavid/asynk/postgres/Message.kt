@@ -399,11 +399,11 @@ internal sealed class Message {
           assert(length >= 6)
           val n = buffer.getShort()
           val fields = (1..n).map {
-            val sb = StringBuilder()
+            val buf = ByteBuffer.allocate(256)
             while (true) {
               val b = buffer.get()
               if (b == 0.toByte()) break
-              sb.appendCodePoint(b.toInt())
+              buf.put(b)
             }
             /*val table =*/ buffer.getInt()
             /*val index =*/ buffer.getShort()
@@ -412,7 +412,11 @@ internal sealed class Message {
             /*val modifier =*/ buffer.getInt()
             val format = buffer.getShort()
             assert(format == 0.toShort())
-            sb.toString() to "${oid}:${len}"
+            buf.flip()
+            String(ByteArray(buf.remaining()).apply {
+              buf.get(this)
+              buf.clear()
+            }) to "${oid}:${len}"
           }
           return RowDescription(fields)
         }
@@ -444,39 +448,42 @@ internal sealed class Message {
           val data = ByteArray(length - 4)
           buffer.get(data)
           val message = StringBuilder()
-          var sb = StringBuilder()
+          val buf = ByteBuffer.allocate(4096)
           for (b in data) {
-            if (sb.isEmpty()) {
+            if (buf.position() == 0) {
               when (b) {
-                'S'.toByte() -> sb.append("SEVERITY: ")
-                'C'.toByte() -> sb.append("SQLSTATE ERROR CODE: ")
-                'M'.toByte() -> sb.append("MESSAGE: ")
-                'D'.toByte() -> sb.append("DETAIL: ")
-                'P'.toByte() -> sb.append("POSITION: ")
-                'p'.toByte() -> sb.append("INTERNAL POSITION: ")
-                'q'.toByte() -> sb.append("INTERNAL QUERY: ")
-                'W'.toByte() -> sb.append("WHERE: ")
-                's'.toByte() -> sb.append("SCHEMA NAME: ")
-                't'.toByte() -> sb.append("TABLE NAME: ")
-                'c'.toByte() -> sb.append("COLUMN NAME: ")
-                'd'.toByte() -> sb.append("DATA TYPE NAME: ")
-                'n'.toByte() -> sb.append("CONSTRAINT NAME: ")
-                'F'.toByte() -> sb.append("FILE: ")
-                'L'.toByte() -> sb.append("LINE: ")
-                'R'.toByte() -> sb.append("ROUTINE: ")
+                'S'.toByte() -> buf.put(SEVERITY)
+                'C'.toByte() -> buf.put(SQLSTATE_ERROR_CODE)
+                'M'.toByte() -> buf.put(MESSAGE)
+                'D'.toByte() -> buf.put(DETAIL)
+                'P'.toByte() -> buf.put(POSITION)
+                'p'.toByte() -> buf.put(INTERNAL_POSITION)
+                'q'.toByte() -> buf.put(INTERNAL_QUERY)
+                'W'.toByte() -> buf.put(WHERE)
+                's'.toByte() -> buf.put(SCHEMA_NAME)
+                't'.toByte() -> buf.put(TABLE_NAME)
+                'c'.toByte() -> buf.put(COLUMN_NAME)
+                'd'.toByte() -> buf.put(DATA_TYPE_NAME)
+                'n'.toByte() -> buf.put(CONSTRAINT_NAME)
+                'F'.toByte() -> buf.put(FILE)
+                'L'.toByte() -> buf.put(LINE)
+                'R'.toByte() -> buf.put(ROUTINE)
               }
             }
             else {
               if (b == 0.toByte()) {
-                message.append(sb)
+                buf.flip()
+                val s = String(ByteArray(buf.remaining()).apply { buf.get(this) })
+                message.append(s)
                 message.append('\n')
-                sb = StringBuilder()
+                buf.clear()
               }
               else {
-                sb.appendCodePoint(b.toInt())
+                buf.put(b)
               }
             }
           }
+          buf.clear()
           return message.toString().let {
             if (first == 'E'.toByte()) ErrorResponse(it) else NoticeResponse(it)
           }
@@ -484,25 +491,49 @@ internal sealed class Message {
         'A'.toByte() -> {
           assert(length > 8)
           /*val processId =*/ buffer.getInt()
-          val sb = StringBuilder()
+          val buf = ByteBuffer.allocate(4096)
           while (true) {
             val b = buffer.get()
             if (b == 0.toByte()) break
-            sb.appendCodePoint(b.toInt())
+            buf.put(b)
           }
-          val channel = sb.toString()
-          sb.setLength(0)
+          buf.flip()
+          val channel = String(ByteArray(buf.remaining()).apply {
+            buf.get(this)
+            buf.clear()
+          })
           while (true) {
             val b = buffer.get()
             if (b == 0.toByte()) break
-            sb.appendCodePoint(b.toInt())
+            buf.put(b)
           }
-          val payload = sb.toString()
+          val payload = String(ByteArray(buf.remaining()).apply {
+            buf.get(this)
+            buf.clear()
+          })
           return NotificationResponse(channel, payload)
         }
         else -> throw IllegalArgumentException("${first.toChar()}")
       }
     }
+
+    private val SEVERITY = "SEVERITY: ".toByteArray()
+    private val SQLSTATE_ERROR_CODE = "SQLSTATE ERROR CODE: ".toByteArray()
+    private val MESSAGE = "MESSAGE: ".toByteArray()
+    private val DETAIL = "DETAIL: ".toByteArray()
+    private val POSITION = "POSITION: ".toByteArray()
+    private val INTERNAL_POSITION = "INTERNAL POSITION: ".toByteArray()
+    private val INTERNAL_QUERY = "INTERNAL QUERY: ".toByteArray()
+    private val WHERE = "WHERE: ".toByteArray()
+    private val SCHEMA_NAME = "SCHEMA NAME: ".toByteArray()
+    private val TABLE_NAME = "TABLE NAME: ".toByteArray()
+    private val COLUMN_NAME = "COLUMN NAME: ".toByteArray()
+    private val DATA_TYPE_NAME = "DATA TYPE NAME: ".toByteArray()
+    private val CONSTRAINT_NAME = "CONSTRAINT NAME: ".toByteArray()
+    private val FILE = "FILE: ".toByteArray()
+    private val LINE = "LINE: ".toByteArray()
+    private val ROUTINE = "ROUTINE: ".toByteArray()
+
 
     private fun md5(username: String, password: String, salt: ByteArray): ByteArray {
       val md5 = MessageDigest.getInstance("MD5")

@@ -20,14 +20,14 @@ buildscript {
 }
 
 plugins {
-  kotlin("jvm") version "1.2.70"
+  kotlin("jvm") version "1.2.71"
   `maven-publish`
   id("org.jetbrains.dokka") version "0.9.17"
   id("com.jfrog.bintray") version "1.8.4"
 }
 
 group = "info.jdavid.asynk"
-version = "0.0.0.14"
+version = "0.0.0.15"
 
 repositories {
   jcenter()
@@ -38,7 +38,7 @@ dependencies {
   compile(kotlin("stdlib-jdk8"))
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:0.26.1")
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-nio:0.26.1")
-  implementation("info.jdavid.asynk:sql:0.0.0.14")
+  implementation("info.jdavid.asynk:sql:0.0.0.15")
   implementation("org.slf4j:slf4j-api:1.7.25")
   testImplementation("org.junit.jupiter:junit-jupiter-api:5.3.0")
   testImplementation("org.junit.jupiter:junit-jupiter-params:5.3.0")
