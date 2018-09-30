@@ -1,22 +1,24 @@
 package info.jdavid.asynk.postgres
 
+import info.jdavid.asynk.core.asyncConnect
+import info.jdavid.asynk.core.asyncRead
+import info.jdavid.asynk.core.asyncWrite
 import info.jdavid.asynk.sql.Connection
+import kotlinx.coroutines.experimental.CancellationException
+import kotlinx.coroutines.experimental.CoroutineScope
 import kotlinx.coroutines.experimental.channels.Channel
 import kotlinx.coroutines.experimental.channels.toCollection
 import kotlinx.coroutines.experimental.channels.toList
 import kotlinx.coroutines.experimental.channels.toMap
-import kotlinx.coroutines.experimental.currentScope
 import kotlinx.coroutines.experimental.launch
-import kotlinx.coroutines.experimental.nio.aConnect
-import kotlinx.coroutines.experimental.nio.aRead
-import kotlinx.coroutines.experimental.nio.aWrite
+import kotlinx.coroutines.experimental.withTimeout
 import org.slf4j.LoggerFactory
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.SocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousSocketChannel
-import java.util.concurrent.TimeUnit
+import kotlin.coroutines.experimental.coroutineContext
 
 typealias PreparedStatement=Connection.PreparedStatement<PostgresConnection>
 
@@ -31,7 +33,11 @@ class PostgresConnection internal constructor(
   private var privateKey = 0
   private var statementCounter = 0
 
-  override suspend fun aClose() {
+  suspend inline fun <R> use(block: (PostgresConnection) -> R): R {
+    return info.jdavid.asynk.core.internal.use(this) { block(this) }
+  }
+
+  override suspend fun close() {
     try {
       send(Message.Terminate())
     }
@@ -39,7 +45,6 @@ class PostgresConnection internal constructor(
       channel.close()
     }
   }
-
 
   override suspend fun startTransaction() {
     affectedRows("BEGIN")
@@ -214,7 +219,7 @@ class PostgresConnection internal constructor(
                                   params: Iterable<Any?>,
                                   columnNameOrAlias: String): PostgresResultSet<T> {
     if (preparedStatement !is PostgresPreparedStatement) throw IllegalArgumentException()
-    val batchSize = 100
+    val batchSize = 128
     val portalName: ByteArray? = null
     val unnamed = preparedStatement.name == null
     bind(preparedStatement.name, portalName, params)
@@ -294,7 +299,7 @@ class PostgresConnection internal constructor(
               else -> throw RuntimeException()
             }
           }
-          val channel = Channel<T>()
+          val channel = Channel<T>(0)
           channel.close()
           return PostgresResultSet(channel)
         }
@@ -308,60 +313,61 @@ class PostgresConnection internal constructor(
       if (it.first == columnNameOrAlias) index else -1
     }.find { it != -1 } ?: throw RuntimeException("Column ${columnNameOrAlias} not found in results.")
     val channel = Channel<T>(batchSize)
-    currentScope {
-      launch {
-        loop@ while (true) {
-          val n = fields.size
-          val message = message()
-          when (message) {
-            is Message.ErrorResponse -> throw RuntimeException("Failed to fetch row.\n${this}")
-            is Message.DataRow -> {
-              val values = message.values
-              assert(n == values.size)
-              val field = fields[k]
-              val result = values[k]
+    CoroutineScope(coroutineContext).launch {
+      var open = true
+      loop@ while (true) {
+        val n = fields.size
+        val message = message()
+        when (message) {
+          is Message.ErrorResponse -> throw RuntimeException("Failed to fetch row.\n${this}")
+          is Message.DataRow -> {
+            val values = message.values
+            assert(n == values.size)
+            val field = fields[k]
+            val result = values[k]
+            if (open) try {
               @Suppress("UNCHECKED_CAST")
               channel.send((if (result == null) null else TextFormat.parse(field.second, result)) as T)
-            }
-            is Message.PortalSuspended -> {
-              execute(portalName, batchSize)
-              send(Message.Flush())
-            }
-            is Message.CommandComplete -> break@loop
+            } catch (ignore: CancellationException) { open = false }
           }
-        }
-        if (unnamed) close(preparedStatement) else close(portalName)
-        sync()
-        message().apply {
-          when (this) {
-            is Message.ErrorResponse -> throw RuntimeException(
-              if (unnamed) {
-                "Failed to close statement:\n${preparedStatement.name}\n${this}"
-              }
-              else {
-                "Failed to close portal.\n${this}"
-              }
-            )
-            is Message.CloseComplete -> Unit
-            else -> throw RuntimeException(
-              if (unnamed) {
-                "Failed to close statement:\n${preparedStatement.name}\n"
-              }
-              else {
-                "Failed to close portal.\n${this}"
-              }
-            )
+          is Message.PortalSuspended -> {
+            execute(portalName, batchSize)
+            send(Message.Flush())
           }
+          is Message.CommandComplete -> break@loop
         }
-        message().apply {
-          when (this) {
-            is Message.ErrorResponse -> throw RuntimeException(this.toString())
-            is Message.ReadyForQuery -> Unit
-            else -> throw RuntimeException()
-          }
-        }
-        channel.close()
       }
+      if (unnamed) close(preparedStatement) else close(portalName)
+      sync()
+      message().apply {
+        when (this) {
+          is Message.ErrorResponse -> throw RuntimeException(
+            if (unnamed) {
+              "Failed to close statement:\n${preparedStatement.name}\n${this}"
+            }
+            else {
+              "Failed to close portal.\n${this}"
+            }
+          )
+          is Message.CloseComplete -> Unit
+          else -> throw RuntimeException(
+            if (unnamed) {
+              "Failed to close statement:\n${preparedStatement.name}\n"
+            }
+            else {
+              "Failed to close portal.\n${this}"
+            }
+          )
+        }
+      }
+      message().apply {
+        when (this) {
+          is Message.ErrorResponse -> throw RuntimeException(this.toString())
+          is Message.ReadyForQuery -> Unit
+          else -> throw RuntimeException()
+        }
+      }
+      channel.close()
     }
     return PostgresResultSet(channel)
   }
@@ -371,7 +377,7 @@ class PostgresConnection internal constructor(
                                      keyColumnNameOrAlias: String,
                                      valueColumnNameOrAlias: String): PostgresResultMap<K,V> {
     if (preparedStatement !is PostgresPreparedStatement) throw IllegalArgumentException()
-    val batchSize = 100
+    val batchSize = 128
     val portalName: ByteArray? = null
     val unnamed = preparedStatement.name == null
     bind(preparedStatement.name, portalName, params)
@@ -451,7 +457,7 @@ class PostgresConnection internal constructor(
               else -> throw RuntimeException()
             }
           }
-          val channel = Channel<Pair<K,V>>()
+          val channel = Channel<Pair<K,V>>(0)
           channel.close()
           return PostgresResultMap(channel)
         }
@@ -468,65 +474,66 @@ class PostgresConnection internal constructor(
       if (it.first == valueColumnNameOrAlias) index else -1
     }.find { it != -1 } ?: throw RuntimeException("Column ${valueColumnNameOrAlias} not found in results.")
     val channel = Channel<Pair<K,V>>(batchSize)
-    currentScope {
-      launch {
-        loop@ while (true) {
-          val n = fields.size
-          val message = message()
-          when (message) {
-            is Message.ErrorResponse -> throw RuntimeException("Failed to fetch row.\n${this}")
-            is Message.DataRow -> {
-              val values = message.values
-              assert(n == values.size)
-              val keyField = fields[k]
-              val keyResult = values[k]
-              val valueField = fields[v]
-              val valueResult = values[v]
+    CoroutineScope(coroutineContext).launch {
+      var open = true
+      loop@ while (true) {
+        val n = fields.size
+        val message = message()
+        when (message) {
+          is Message.ErrorResponse -> throw RuntimeException("Failed to fetch row.\n${this}")
+          is Message.DataRow -> {
+            val values = message.values
+            assert(n == values.size)
+            val keyField = fields[k]
+            val keyResult = values[k]
+            val valueField = fields[v]
+            val valueResult = values[v]
+            if (open) try {
               @Suppress("UNCHECKED_CAST")
               channel.send(
                 (if (keyResult == null) null else TextFormat.parse(keyField.second, keyResult)) as K to
                   (if (valueResult == null) null else TextFormat.parse(valueField.second, valueResult)) as V
               )
-            }
-            is Message.PortalSuspended -> {
-              execute(portalName, batchSize)
-              send(Message.Flush())
-            }
-            is Message.CommandComplete -> break@loop
+            } catch(ignore: CancellationException) { open = false }
           }
-        }
-        if (unnamed) close(preparedStatement) else close(portalName)
-        sync()
-        message().apply {
-          when (this) {
-            is Message.ErrorResponse -> throw RuntimeException(
-              if (unnamed) {
-                "Failed to close statement:\n${preparedStatement.name}\n${this}"
-              }
-              else {
-                "Failed to close portal.\n${this}"
-              }
-            )
-            is Message.CloseComplete -> Unit
-            else -> throw RuntimeException(
-              if (unnamed) {
-                "Failed to close statement:\n${preparedStatement.name}\n"
-              }
-              else {
-                "Failed to close portal.\n${this}"
-              }
-            )
+          is Message.PortalSuspended -> {
+            execute(portalName, batchSize)
+            send(Message.Flush())
           }
+          is Message.CommandComplete -> break@loop
         }
-        message().apply {
-          when (this) {
-            is Message.ErrorResponse -> throw RuntimeException(this.toString())
-            is Message.ReadyForQuery -> Unit
-            else -> throw RuntimeException()
-          }
-        }
-        channel.close()
       }
+      if (unnamed) close(preparedStatement) else close(portalName)
+      sync()
+      message().apply {
+        when (this) {
+          is Message.ErrorResponse -> throw RuntimeException(
+            if (unnamed) {
+              "Failed to close statement:\n${preparedStatement.name}\n${this}"
+            }
+            else {
+              "Failed to close portal.\n${this}"
+            }
+          )
+          is Message.CloseComplete -> Unit
+          else -> throw RuntimeException(
+            if (unnamed) {
+              "Failed to close statement:\n${preparedStatement.name}\n"
+            }
+            else {
+              "Failed to close portal.\n${this}"
+            }
+          )
+        }
+      }
+      message().apply {
+        when (this) {
+          is Message.ErrorResponse -> throw RuntimeException(this.toString())
+          is Message.ReadyForQuery -> Unit
+          else -> throw RuntimeException()
+        }
+      }
+      channel.close()
     }
     return PostgresResultMap(channel)
   }
@@ -534,7 +541,7 @@ class PostgresConnection internal constructor(
   override suspend fun rows(preparedStatement: PreparedStatement,
                             params: Iterable<Any?>): PostgresResultSet<Map<String,Any?>> {
     if (preparedStatement !is PostgresPreparedStatement) throw IllegalArgumentException()
-    val batchSize = 100
+    val batchSize = 128
     val portalName: ByteArray? = null
     val unnamed = preparedStatement.name == null
     bind(preparedStatement.name, portalName, params)
@@ -625,63 +632,62 @@ class PostgresConnection internal constructor(
       }
     }
     val channel = Channel<Map<String, Any?>>(batchSize)
-    currentScope {
-      launch {
-        loop@ while (true) {
-          val n = fields.size
-          val message = message()
-          when (message) {
-            is Message.ErrorResponse -> throw RuntimeException("Failed to fetch row.\n${this}")
-            is Message.DataRow -> {
-              val values = message.values
-              assert(n == values.size)
-              val map = LinkedHashMap<String, Any?>(n)
-              for (i in 0 until n) {
-                val field = fields[i]
-                val result = values[i]
-                map[field.first] = if (result == null) null else TextFormat.parse(field.second, result)
-              }
-              channel.send(map)
+    CoroutineScope(coroutineContext).launch {
+      var open = true
+      loop@ while (true) {
+        val n = fields.size
+        val message = message()
+        when (message) {
+          is Message.ErrorResponse -> throw RuntimeException("Failed to fetch row.\n${this}")
+          is Message.DataRow -> {
+            val values = message.values
+            assert(n == values.size)
+            val map = LinkedHashMap<String, Any?>(n)
+            for (i in 0 until n) {
+              val field = fields[i]
+              val result = values[i]
+              map[field.first] = if (result == null) null else TextFormat.parse(field.second, result)
             }
-            is Message.PortalSuspended -> {
-              execute(portalName, batchSize)
-              send(Message.Flush())
-            }
-            is Message.CommandComplete -> break@loop
+            if (open) try { channel.send(map) } catch (ignore: CancellationException) { open = false }
           }
-        }
-        if (unnamed) close(preparedStatement) else close(portalName)
-        sync()
-        message().apply {
-          when (this) {
-            is Message.ErrorResponse -> throw RuntimeException(
-              if (unnamed) {
-                "Failed to close statement:\n${preparedStatement.name}\n${this}"
-              }
-              else {
-                "Failed to close portal.\n${this}"
-              }
-            )
-            is Message.CloseComplete -> Unit
-            else -> throw RuntimeException(
-              if (unnamed) {
-                "Failed to close statement:\n${preparedStatement.name}\n"
-              }
-              else {
-                "Failed to close portal.\n${this}"
-              }
-            )
+          is Message.PortalSuspended -> {
+            execute(portalName, batchSize)
+            send(Message.Flush())
           }
+          is Message.CommandComplete -> break@loop
         }
-        message().apply {
-          when (this) {
-            is Message.ErrorResponse -> throw RuntimeException(this.toString())
-            is Message.ReadyForQuery -> Unit
-            else -> throw RuntimeException()
-          }
-        }
-        channel.close()
       }
+      if (unnamed) close(preparedStatement) else close(portalName)
+      sync()
+      message().apply {
+        when (this) {
+          is Message.ErrorResponse -> throw RuntimeException(
+            if (unnamed) {
+              "Failed to close statement:\n${preparedStatement.name}\n${this}"
+            }
+            else {
+              "Failed to close portal.\n${this}"
+            }
+          )
+          is Message.CloseComplete -> Unit
+          else -> throw RuntimeException(
+            if (unnamed) {
+              "Failed to close statement:\n${preparedStatement.name}\n"
+            }
+            else {
+              "Failed to close portal.\n${this}"
+            }
+          )
+        }
+      }
+      message().apply {
+        when (this) {
+          is Message.ErrorResponse -> throw RuntimeException(this.toString())
+          is Message.ReadyForQuery -> Unit
+          else -> throw RuntimeException()
+        }
+      }
+      channel.close()
     }
     return PostgresResultSet(channel)
   }
@@ -771,8 +777,10 @@ class PostgresConnection internal constructor(
 
   internal suspend fun send(message: Message.FromClient) {
     message.writeTo(buffer.clear() as ByteBuffer)
-    (buffer.flip() as ByteBuffer).apply {
-      while (remaining() > 0) channel.aWrite(this, 5000L, TimeUnit.MILLISECONDS)
+    (buffer.flip() as ByteBuffer).also {
+      while (it.remaining() > 0) {
+        withTimeout(5000L) { channel.asyncWrite(it) }
+      }
     }
   }
 
@@ -786,7 +794,7 @@ class PostgresConnection internal constructor(
     while (true) {
       buffer.compact()
       val left = buffer.capacity() - buffer.position()
-      val n = channel.aRead(buffer, 5000L, TimeUnit.MILLISECONDS)
+      val n = withTimeout(5000L) { channel.asyncRead(buffer) }.toInt()
       if (n == left) throw RuntimeException("Connection buffer too small.")
       if (buffer.position() == 0) return null
       buffer.flip()
@@ -830,6 +838,11 @@ class PostgresConnection internal constructor(
       }
       this.query = sb.toString()
     }
+
+    suspend inline fun <R> use(block: (PostgresPreparedStatement) -> R): R {
+      return info.jdavid.asynk.core.internal.use(this) { block(this) }
+    }
+
     override suspend fun rows() = this@PostgresConnection.rows(this)
     override suspend fun rows(params: Iterable<Any?>) = this@PostgresConnection.rows(this, params)
     override suspend fun <T> values(columnNameOrAlias: String): PostgresResultSet<T> =
@@ -847,7 +860,7 @@ class PostgresConnection internal constructor(
     override suspend fun affectedRows(
       params: Iterable<Any?>
     ) = this@PostgresConnection.affectedRows(this, params)
-    override suspend fun aClose() = this@PostgresConnection.close(this)
+    override suspend fun close() = this@PostgresConnection.close(this)
   }
 
   open class PostgresResultSet<T> internal constructor(protected val channel: Channel<T>): Connection.ResultSet<T> {
@@ -885,7 +898,7 @@ class PostgresConnection internal constructor(
         if (bufferSize < 1024) throw IllegalArgumentException(
           "Buffer size ${bufferSize} is smaller than the minumum buffer size 1024."
         )
-        channel.aConnect(address)
+        channel.asyncConnect(address)
         val buffer = ByteBuffer.allocateDirect(bufferSize)
         val connection = PostgresConnection(channel, buffer)
         connection.send(Message.StartupMessage(credentials.username, database))
