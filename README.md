@@ -1,4 +1,4 @@
-![jcenter](https://img.shields.io/badge/_jcenter_-0.0.0.16-6688ff.png?style=flat) &#x2003; ![jcenter](https://img.shields.io/badge/_Tests_-59/59-green.png?style=flat)
+![jcenter](https://img.shields.io/badge/_jcenter_-0.0.0.17-6688ff.png?style=flat) &#x2003; ![jcenter](https://img.shields.io/badge/_Tests_-75/75-green.png?style=flat)
 # Asynk POSTGRES
 A Postgres async client with suspend functions for kotlin coroutines.
 
@@ -7,7 +7,7 @@ A Postgres async client with suspend functions for kotlin coroutines.
 The maven artifacts are on [Bintray](https://bintray.com/programingjd/maven/info.jdavid.asynk.postgres/view)
 and [jcenter](https://bintray.com/search?query=info.jdavid.asynk.postgres).
 
-[Download](https://bintray.com/artifact/download/programingjd/maven/info/jdavid/asynk/postgres/0.0.0.16/postgres-0.0.0.16.jar) the latest jar.
+[Download](https://bintray.com/artifact/download/programingjd/maven/info/jdavid/asynk/postgres/0.0.0.17/postgres-0.0.0.17.jar) the latest jar.
 
 __Maven__
 
@@ -17,7 +17,7 @@ Include [those settings](https://bintray.com/repo/downloadMavenRepoSettingsFile/
 <dependency>
   <groupId>info.jdavid.asynk</groupId>
   <artifactId>postgres</artifactId>
-  <version>0.0.0.16</version>
+  <version>0.0.0.17</version>
 </dependency>
 ```
 __Gradle__
@@ -30,7 +30,7 @@ repositories {
 ```
 ```
 dependencies {
-  compile 'info.jdavid.asynk:postgres:0.0.0.16'
+  compile 'info.jdavid.asynk:postgres:0.0.0.17'
 }
 ```
 

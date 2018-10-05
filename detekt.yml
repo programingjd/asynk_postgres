@@ -1,0 +1,13 @@
+build:
+  maxIssues: 0
+
+complexity:
+  active: true
+  TooManyFunctions:
+    threshold: 50
+  LargeClass:
+    threshold: 500
+  ComplexMethod:
+    threshold: 50
+  NestedBlockDepth:
+    threshold: 5

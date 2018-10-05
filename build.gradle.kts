@@ -1,57 +1,60 @@
-import com.jfrog.bintray.gradle.BintrayExtension
-import org.jetbrains.dokka.gradle.DokkaTask
+@file:Suppress("RemoveCurlyBracesFromTemplate")
+
 import java.io.FileInputStream
 import java.io.FileWriter
+import com.jfrog.bintray.gradle.BintrayExtension
 import org.cyberneko.html.parsers.DOMParser
-import org.jetbrains.kotlin.config.CompilerConfiguration
-import org.jetbrains.kotlin.gradle.dsl.Coroutines
-import org.jetbrains.kotlin.gradle.dsl.KotlinJvmCompile
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.w3c.dom.Node
 import org.xml.sax.InputSource
 import javax.xml.xpath.XPathConstants
 import javax.xml.xpath.XPathFactory
 
-buildscript {
-  repositories {
-    jcenter()
-    mavenCentral()
-  }
-}
-
 plugins {
-  kotlin("jvm") version "1.2.71"
-  `maven-publish`
+  kotlin("jvm") version KOTLIN.version
   id("org.jetbrains.dokka") version "0.9.17"
+  `maven-publish`
   id("com.jfrog.bintray") version "1.8.4"
+  id("io.gitlab.arturbosch.detekt").version("1.0.0.RC9.2")
 }
 
 group = "info.jdavid.asynk"
-version = "0.0.0.16"
+version = ASYNK.version
 
 repositories {
   jcenter()
-  maven("http://dl.bintray.com/programingjd/maven")
 }
 
 dependencies {
-  compile(kotlin("stdlib-jdk8"))
-  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:0.27.0")
-  implementation("info.jdavid.asynk:sql:0.0.0.16.2")
+  implementation("org.jetbrains.kotlin:kotlin-stdlib:${KOTLIN.version}")
+  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${KOTLINX.version}")
+  implementation("info.jdavid.asynk:core:${ASYNK.version}")
+  implementation("info.jdavid.asynk:sql:${ASYNK.version}")
   implementation("org.slf4j:slf4j-api:1.7.25")
   testImplementation("org.junit.jupiter:junit-jupiter-api:5.3.0")
   testImplementation("org.junit.jupiter:junit-jupiter-params:5.3.0")
   testRuntime("org.junit.jupiter:junit-jupiter-engine:5.3.0")
-  testImplementation("com.fasterxml.jackson.core:jackson-databind:2.9.6")
-  testImplementation("org.apache.httpcomponents:httpclient:4.5.6")
   testRuntime("org.slf4j:slf4j-jdk14:1.7.25")
+  testImplementation("com.fasterxml.jackson.core:jackson-databind:2.9.7")
+  testImplementation("org.apache.httpcomponents:httpclient:4.5.6")
 }
 
-kotlin {
-  experimental.coroutines = Coroutines.ENABLE
+
+tasks.compileKotlin {
+  kotlinOptions {
+    jvmTarget = "1.8"
+  }
+}
+tasks.compileTestKotlin {
+  kotlinOptions {
+    jvmTarget = "1.8"
+  }
 }
 
-val dokkaJavadoc by tasks.creating(DokkaTask::class) {
+tasks.jar {
+  dependsOn("detekt")
+}
+
+tasks.dokka {
   outputFormat = "javadoc"
   includeNonPublic = false
   skipEmptyPackages = true
@@ -60,35 +63,32 @@ val dokkaJavadoc by tasks.creating(DokkaTask::class) {
   outputDirectory = "${buildDir}/javadoc"
 }
 
-val sourcesJar by tasks.creating(Jar::class) {
-  classifier = "sources"
-  from(sourceSets["main"].allSource)
+tasks.javadoc {
+  dependsOn("dokka")
 }
 
-val javadocJar by tasks.creating(Jar::class) {
-  classifier = "javadoc"
-  from("${buildDir}/javadoc")
-  dependsOn("javadoc")
-}
-
-tasks.withType(KotlinJvmCompile::class.java).all {
-  kotlinOptions {
-    jvmTarget = "1.8"
-  }
-}
-
-tasks.withType<Test> {
-  useJUnitPlatform()
+tasks.test {
+  @Suppress("UnstableApiUsage") useJUnitPlatform()
   testLogging {
     events("passed", "skipped", "failed")
   }
 }
 
-val jar: Jar by tasks
-jar.apply {
+tasks.jar {
   manifest {
     attributes["Sealed"] = true
   }
+}
+
+val sourcesJar by tasks.registering(Jar::class) {
+  classifier = "sources"
+  from (sourceSets["main"].allSource)
+}
+
+val javadocJar by tasks.registering(Jar::class) {
+  classifier = "javadoc"
+  from(tasks.dokka.get().outputDirectory)
+  dependsOn("javadoc")
 }
 
 publishing {
@@ -96,38 +96,31 @@ publishing {
     maven {
       url = uri("${buildDir}/repo")
     }
-  }
-  publications {
-    register("mavenJava", MavenPublication::class.java) {
-      from(components["java"])
-      artifact(sourcesJar)
-      artifact(javadocJar)
+    publications {
+      register("mavenJava", MavenPublication::class) {
+        @Suppress("UnstableApiUsage") from(components["java"])
+        artifact(sourcesJar.get())
+        artifact(javadocJar.get())
+      }
     }
   }
 }
 
 bintray {
-  user = "programingjd"
-  key = {
-    "bintrayApiKey".let { key: String ->
-      File("local.properties").readLines().findLast {
-        it.startsWith("${key}=")
-      }?.substring(key.length + 1)
-    }
-  }()
-  //dryRun = true
+  user = BINTRAY.user
+  key = BINTRAY.password(rootProject.projectDir)
   publish = true
-  setPublications("mavenJava")
+  setPublications(*publishing.publications.names.toTypedArray())
   pkg(delegateClosureOf<BintrayExtension.PackageConfig>{
     repo = "maven"
     name = "${project.group}.${project.name}"
-    websiteUrl = "https://github.com/programingjd/asynk_postgres"
-    issueTrackerUrl = "https://github.com/programingjd/asynk_postgres/issues"
-    vcsUrl = "https://github.com/programingjd/asynk_postgres.git"
-    githubRepo = "programingjd/asynk_postgres"
+    websiteUrl = "https://github.com/${BINTRAY.user}/asynk_${project.name}"
+    issueTrackerUrl = "https://github.com/${BINTRAY.user}/asynk_${project.name}/issues"
+    vcsUrl = "https://github.com/${BINTRAY.user}/asynk_${project.name}.git"
+    githubRepo = "${BINTRAY.user}/asynk_${project.name}"
     githubReleaseNotesFile = "README.md"
     setLicenses("Apache-2.0")
-    setLabels("asynk", "postgres", "postgresql", "sql", "java", "kotlin", "async", "coroutines", "suspend")
+    setLabels("asynk", "java", "kotlin", "async", "coroutines", "suspend", "nio", "nio2")
     publicDownloadNumbers = true
     version(delegateClosureOf<BintrayExtension.VersionConfig> {
       name = "${project.version}"
@@ -138,50 +131,44 @@ bintray {
   })
 }
 
-tasks {
-  "test" {
-    val test = this as Test
-    doLast {
-      DOMParser().let {
-        it.parse(InputSource(FileInputStream(test.reports.html.entryPoint)))
-        XPathFactory.newInstance().newXPath().apply {
-          val total =
-            (
-              evaluate("DIV", it.document.getElementById("tests"), XPathConstants.NODE) as Node
-            ).textContent.toInt()
-          val failed =
-            (
-              evaluate("DIV", it.document.getElementById("failures"), XPathConstants.NODE) as Node
-            ).textContent.toInt()
-          val badge = { label: String, text: String, color: String ->
-            "https://img.shields.io/badge/_${label}_-${text}-${color}.png?style=flat"
-          }
-          val color = if (failed == 0) "green" else if (failed < 3) "yellow" else "red"
-          File("README.md").apply {
-            readLines().mapIndexed { i, line ->
-              when (i) {
-                0 -> "![jcenter](${badge("jcenter", "${project.version}", "6688ff")}) &#x2003; " +
-                     "![jcenter](${badge("Tests", "${total-failed}/${total}", color)})"
-                9 -> "[Download](https://bintray.com/artifact/download/programingjd/maven/info/jdavid/asynk/postgres/${project.version}/postgres-${project.version}.jar) the latest jar."
-                19 -> "  <version>${project.version}</version>"
-                32 -> "  compile 'info.jdavid.asynk:postgres:${project.version}'"
-                else -> line
-              }
-            }.joinToString("\n").let {
-              FileWriter(this).apply {
-                write(it)
-                close()
-              }
+tasks.bintrayUpload {
+  dependsOn("check")
+}
+
+detekt {
+  config = files("detekt.yml")
+}
+
+tasks.test {
+  doLast {
+    DOMParser().also { parser ->
+      parser.parse(InputSource(FileInputStream(reports.html.entryPoint)))
+      XPathFactory.newInstance().newXPath().apply {
+        val total =
+          (evaluate("DIV", parser.document.getElementById("tests"), XPathConstants.NODE) as Node).
+            textContent.toInt()
+        val failed =
+          (evaluate("DIV", parser.document.getElementById("failures"), XPathConstants.NODE) as Node).
+            textContent.toInt()
+        val badge = { label: String, text: String, color: String ->
+          "https://img.shields.io/badge/_${label}_-${text}-${color}.png?style=flat"
+        }
+        val color = if (failed == 0) "green" else if (failed < 3) "yellow" else "red"
+        File("README.md").apply {
+          readLines().mapIndexed { i, line ->
+            when (i) {
+              0 -> "![jcenter](${badge("jcenter", "${project.version}", "6688ff")}) &#x2003; " +
+                   "![jcenter](${badge("Tests", "${total-failed}/${total}", color)})"
+              9 -> "[Download](https://bintray.com/artifact/download/programingjd/maven/info/jdavid/asynk/postgres/${project.version}/postgres-${project.version}.jar) the latest jar."
+              19 -> "  <version>${project.version}</version>"
+              32 -> "  compile 'info.jdavid.asynk:postgres:${project.version}'"
+              else -> line
             }
+          }.joinToString("\n").also { line ->
+            FileWriter(this).use { it.write(line) }
           }
         }
       }
     }
-  }
-  "bintrayUpload" {
-    dependsOn("check")
-  }
-  "javadoc" {
-    dependsOn("dokkaJavadoc")
   }
 }

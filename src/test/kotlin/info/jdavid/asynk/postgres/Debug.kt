@@ -1,8 +1,7 @@
 package info.jdavid.asynk.postgres
 
-import info.jdavid.asynk.sql.use
-import kotlinx.coroutines.experimental.launch
-import kotlinx.coroutines.experimental.runBlocking
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.net.InetAddress
 import java.net.InetSocketAddress
 

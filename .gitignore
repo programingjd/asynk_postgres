@@ -11,6 +11,8 @@ Thumbs.db
 *.p12
 
 /.gradle
+/buildSrc/.gradle
+/buildSrc/build
 
 /.hg
 

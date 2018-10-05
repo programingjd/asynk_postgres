@@ -25,10 +25,14 @@ object Docker {
   private val dockerApiUrl = "http://localhost:2375"
 
   enum class DatabaseVersion(val label: String, val port: Int) {
+//    POSTGRES_91("library/postgres:9.1", 5431),
+//    POSTGRES_92("library/postgres:9.2", 5432),
     POSTGRES_93("library/postgres:9.3", 5433),
     POSTGRES_94("library/postgres:9.4", 5434),
     POSTGRES_95("library/postgres:9.5", 5435),
     POSTGRES_96("library/postgres:9.6", 5436),
+    POSTGRES_103("library/postgres:10.3", 5438),
+    POSTGRES_104("library/postgres:10.4", 5439),
     POSTGRES_105("library/postgres:10.5", 5437)
   }
 
