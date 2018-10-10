@@ -18,7 +18,7 @@ plugins {
 }
 
 group = "info.jdavid.asynk"
-version = ASYNK.version
+version = "${ASYNK.version}.3"
 
 repositories {
   jcenter()

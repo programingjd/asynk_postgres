@@ -812,8 +812,8 @@ class PostgresConnection internal constructor(
         is Message.NotificationResponse -> warn(message.toString())
         is Message.NoticeResponse -> warn(message.toString())
         is Message.ParameterStatus -> props[message.key] = message.value
+        else -> return message
       }
-      return message
     }
     return null
   }

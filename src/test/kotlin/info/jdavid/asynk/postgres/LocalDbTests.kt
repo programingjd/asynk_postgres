@@ -46,6 +46,36 @@ class LocalDbTests {
 
   @ParameterizedTest(name = "{index} => {0}")
   @EnumSource(value = Docker.DatabaseVersion::class)
+  fun testNotice(databaseVersion: Docker.DatabaseVersion) {
+    runBlocking {
+      val address = InetSocketAddress(InetAddress.getLocalHost(), databaseVersion.port)
+      credentials.connectTo(databaseName, address).use {
+        assertEquals(0, it.affectedRows(
+          """
+            CREATE TEMPORARY TABLE test (
+              id             serial    PRIMARY KEY,
+              name           text      NOT NULL,
+              active         boolean   DEFAULT FALSE NOT NULL,
+              creation_date  date      DEFAULT current_timestamp
+            )
+          """.trimIndent()
+        ))
+        assertEquals(0, it.affectedRows(
+          """
+            CREATE TEMPORARY TABLE IF NOT EXISTS test (
+              id             serial    PRIMARY KEY,
+              name           text      NOT NULL,
+              active         boolean   DEFAULT FALSE NOT NULL,
+              creation_date  date      DEFAULT current_timestamp
+            )
+          """.trimIndent()
+        ))
+      }
+    }
+  }
+
+  @ParameterizedTest(name = "{index} => {0}")
+  @EnumSource(value = Docker.DatabaseVersion::class)
   fun testSimple(databaseVersion: Docker.DatabaseVersion) {
     runBlocking {
       val address = InetSocketAddress(InetAddress.getLocalHost(), databaseVersion.port)
