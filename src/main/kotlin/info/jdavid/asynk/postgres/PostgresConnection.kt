@@ -6,12 +6,13 @@ import info.jdavid.asynk.core.asyncWrite
 import info.jdavid.asynk.sql.Connection
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.toCollection
 import kotlinx.coroutines.channels.toList
 import kotlinx.coroutines.channels.toMap
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeout
 import org.slf4j.LoggerFactory
 import java.net.InetAddress
 import java.net.InetSocketAddress
@@ -176,50 +177,60 @@ class PostgresConnection internal constructor(
     }
   }
 
-  override suspend fun <T> values(sqlStatement: String, columnNameOrAlias: String): PostgresResultSet<T> =
-    values(sqlStatement, emptyList(), columnNameOrAlias)
+  override suspend fun <T> values(sqlStatement: String,
+                                  columnNameOrAlias: String,
+                                  batchSize: Int): PostgresResultSet<T> =
+    values(sqlStatement, emptyList(), columnNameOrAlias, batchSize)
 
   override suspend fun <K,V> entries(sqlStatement: String,
                                      keyColumnNameOrAlias: String,
-                                     valueColumnNameOrAlias: String): PostgresResultMap<K,V> =
-    entries(sqlStatement, emptyList(), keyColumnNameOrAlias, valueColumnNameOrAlias)
+                                     valueColumnNameOrAlias: String,
+                                     batchSize: Int): PostgresResultMap<K,V> =
+    entries(sqlStatement, emptyList(), keyColumnNameOrAlias, valueColumnNameOrAlias, batchSize)
 
-  override suspend fun rows(sqlStatement: String) = rows(sqlStatement, emptyList())
+  override suspend fun rows(sqlStatement: String, batchSize: Int) = rows(sqlStatement, emptyList(), batchSize)
 
   override suspend fun <T> values(sqlStatement: String, params: Iterable<Any?>,
-                                  columnNameOrAlias: String): PostgresResultSet<T> {
+                                  columnNameOrAlias: String,
+                                  batchSize: Int): PostgresResultSet<T> {
     val statement = prepare(sqlStatement, null)
-    return values(statement, params, columnNameOrAlias)
+    return values(statement, params, columnNameOrAlias, batchSize)
   }
 
   override suspend fun <K,V> entries(sqlStatement: String, params: Iterable<Any?>,
                                      keyColumnNameOrAlias: String,
-                                     valueColumnNameOrAlias: String): PostgresResultMap<K,V> {
+                                     valueColumnNameOrAlias: String,
+                                     batchSize: Int): PostgresResultMap<K,V> {
     val statement = prepare(sqlStatement, null)
-    return entries(statement, params, keyColumnNameOrAlias, valueColumnNameOrAlias)
+    return entries(statement, params, keyColumnNameOrAlias, valueColumnNameOrAlias, batchSize)
   }
 
-  override suspend fun rows(sqlStatement: String, params: Iterable<Any?>): PostgresResultSet<Map<String,Any?>> {
+  override suspend fun rows(sqlStatement: String,
+                            params: Iterable<Any?>,
+                            batchSize: Int): PostgresResultSet<Map<String,Any?>> {
     val statement = prepare(sqlStatement, null)
-    return rows(statement, params)
+    return rows(statement, params, batchSize)
   }
 
   override suspend fun <T> values(preparedStatement: PreparedStatement,
-                                  columnNameOrAlias: String): PostgresResultSet<T> =
-    values(preparedStatement, emptyList(), columnNameOrAlias)
+                                  columnNameOrAlias: String,
+                                  batchSize: Int): PostgresResultSet<T> =
+    values(preparedStatement, emptyList(), columnNameOrAlias, batchSize)
 
   override suspend fun <K,V> entries(preparedStatement: PreparedStatement,
                                      keyColumnNameOrAlias: String,
-                                     valueColumnNameOrAlias: String): PostgresResultMap<K,V> =
-    entries(preparedStatement, emptyList(), keyColumnNameOrAlias, valueColumnNameOrAlias)
+                                     valueColumnNameOrAlias: String,
+                                     batchSize: Int): PostgresResultMap<K,V> =
+    entries(preparedStatement, emptyList(), keyColumnNameOrAlias, valueColumnNameOrAlias, batchSize)
 
-  override suspend fun rows(preparedStatement: PreparedStatement) = rows(preparedStatement, emptyList())
+  override suspend fun rows(preparedStatement: PreparedStatement, batchSize: Int) =
+    rows(preparedStatement, emptyList(), batchSize)
 
   override suspend fun <T> values(preparedStatement: PreparedStatement,
                                   params: Iterable<Any?>,
-                                  columnNameOrAlias: String): PostgresResultSet<T> {
+                                  columnNameOrAlias: String,
+                                  batchSize: Int): PostgresResultSet<T> {
     if (preparedStatement !is PostgresPreparedStatement) throw IllegalArgumentException()
-    val batchSize = 128
     val portalName: ByteArray? = null
     val unnamed = preparedStatement.name == null
     bind(preparedStatement.name, portalName, params)
@@ -313,7 +324,7 @@ class PostgresConnection internal constructor(
       if (it.first == columnNameOrAlias) index else -1
     }.find { it != -1 } ?: throw RuntimeException("Column ${columnNameOrAlias} not found in results.")
     val channel = Channel<T>(batchSize)
-    CoroutineScope(coroutineContext).launch {
+    val job = CoroutineScope(coroutineContext).launch {
       var open = true
       loop@ while (true) {
         val n = fields.size
@@ -369,15 +380,15 @@ class PostgresConnection internal constructor(
       }
       channel.close()
     }
-    return PostgresResultSet(channel)
+    return PostgresResultSet(channel, job)
   }
 
   override suspend fun <K,V> entries(preparedStatement: PreparedStatement,
                                      params: Iterable<Any?>,
                                      keyColumnNameOrAlias: String,
-                                     valueColumnNameOrAlias: String): PostgresResultMap<K,V> {
+                                     valueColumnNameOrAlias: String,
+                                     batchSize: Int): PostgresResultMap<K,V> {
     if (preparedStatement !is PostgresPreparedStatement) throw IllegalArgumentException()
-    val batchSize = 128
     val portalName: ByteArray? = null
     val unnamed = preparedStatement.name == null
     bind(preparedStatement.name, portalName, params)
@@ -474,7 +485,7 @@ class PostgresConnection internal constructor(
       if (it.first == valueColumnNameOrAlias) index else -1
     }.find { it != -1 } ?: throw RuntimeException("Column ${valueColumnNameOrAlias} not found in results.")
     val channel = Channel<Pair<K,V>>(batchSize)
-    CoroutineScope(coroutineContext).launch {
+    val job = CoroutineScope(coroutineContext).launch {
       var open = true
       loop@ while (true) {
         val n = fields.size
@@ -535,13 +546,13 @@ class PostgresConnection internal constructor(
       }
       channel.close()
     }
-    return PostgresResultMap(channel)
+    return PostgresResultMap(channel, job)
   }
 
   override suspend fun rows(preparedStatement: PreparedStatement,
-                            params: Iterable<Any?>): PostgresResultSet<Map<String,Any?>> {
+                            params: Iterable<Any?>,
+                            batchSize: Int): PostgresResultSet<Map<String,Any?>> {
     if (preparedStatement !is PostgresPreparedStatement) throw IllegalArgumentException()
-    val batchSize = 128
     val portalName: ByteArray? = null
     val unnamed = preparedStatement.name == null
     bind(preparedStatement.name, portalName, params)
@@ -632,7 +643,7 @@ class PostgresConnection internal constructor(
       }
     }
     val channel = Channel<Map<String, Any?>>(batchSize)
-    CoroutineScope(coroutineContext).launch {
+    val job = CoroutineScope(coroutineContext).launch {
       var open = true
       loop@ while (true) {
         val n = fields.size
@@ -689,7 +700,7 @@ class PostgresConnection internal constructor(
       }
       channel.close()
     }
-    return PostgresResultSet(channel)
+    return PostgresResultSet(channel, job)
   }
 
   suspend fun close(preparedStatement: PostgresPreparedStatement) {
@@ -779,7 +790,7 @@ class PostgresConnection internal constructor(
     message.writeTo(buffer.clear() as ByteBuffer)
     (buffer.flip() as ByteBuffer).also {
       while (it.remaining() > 0) {
-        withTimeout(5000L) { channel.asyncWrite(it) }
+        channel.asyncWrite(it)
       }
     }
   }
@@ -794,7 +805,7 @@ class PostgresConnection internal constructor(
     while (true) {
       buffer.compact()
       val left = buffer.capacity() - buffer.position()
-      val n = withTimeout(5000L) { channel.asyncRead(buffer) }.toInt()
+      val n = channel.asyncRead(buffer).toInt()
       if (n == left) throw RuntimeException("Connection buffer too small.")
       if (buffer.position() == 0) return null
       buffer.flip()
@@ -843,19 +854,24 @@ class PostgresConnection internal constructor(
       return info.jdavid.asynk.core.internal.use(this) { block(this) }
     }
 
-    override suspend fun rows() = this@PostgresConnection.rows(this)
-    override suspend fun rows(params: Iterable<Any?>) = this@PostgresConnection.rows(this, params)
-    override suspend fun <T> values(columnNameOrAlias: String): PostgresResultSet<T> =
-      this@PostgresConnection.values(this, columnNameOrAlias)
-    override suspend fun <T> values(params: Iterable<Any?>, columnNameOrAlias: String): PostgresResultSet<T> =
-      this@PostgresConnection.values(this, params, columnNameOrAlias)
+    override suspend fun rows(batchSize: Int) = this@PostgresConnection.rows(this, batchSize)
+    override suspend fun rows(params: Iterable<Any?>, batchSize: Int) =
+      this@PostgresConnection.rows(this, params, batchSize)
+    override suspend fun <T> values(columnNameOrAlias: String, batchSize: Int): PostgresResultSet<T> =
+      this@PostgresConnection.values(this, columnNameOrAlias, batchSize)
+    override suspend fun <T> values(params: Iterable<Any?>,
+                                    columnNameOrAlias: String,
+                                    batchSize: Int): PostgresResultSet<T> =
+      this@PostgresConnection.values(this, params, columnNameOrAlias, batchSize)
     override suspend fun <K,V> entries(keyColumnNameOrAlias: String,
-                                       valueColumnNameOrAlias: String): PostgresResultMap<K,V> =
-      this@PostgresConnection.entries(this, keyColumnNameOrAlias, valueColumnNameOrAlias)
+                                       valueColumnNameOrAlias: String,
+                                       batchSize: Int): PostgresResultMap<K,V> =
+      this@PostgresConnection.entries(this, keyColumnNameOrAlias, valueColumnNameOrAlias, batchSize)
     override suspend fun <K,V> entries(params: Iterable<Any?>,
                                        keyColumnNameOrAlias: String,
-                                       valueColumnNameOrAlias: String): PostgresResultMap<K,V> =
-      this@PostgresConnection.entries(this, params, keyColumnNameOrAlias, valueColumnNameOrAlias)
+                                       valueColumnNameOrAlias: String,
+                                       batchSize: Int): PostgresResultMap<K,V> =
+      this@PostgresConnection.entries(this, params, keyColumnNameOrAlias, valueColumnNameOrAlias, batchSize)
     override suspend fun affectedRows() = this@PostgresConnection.affectedRows(this)
     override suspend fun affectedRows(
       params: Iterable<Any?>
@@ -863,16 +879,25 @@ class PostgresConnection internal constructor(
     override suspend fun close() = this@PostgresConnection.close(this)
   }
 
-  open class PostgresResultSet<T> internal constructor(protected val channel: Channel<T>): Connection.ResultSet<T> {
+  open class PostgresResultSet<T> internal constructor(
+    protected val channel: Channel<T>,
+    private val job: Job? = null
+  ): Connection.ResultSet<T> {
     override operator fun iterator() = channel.iterator()
-    override fun close() { channel.cancel() }
+    override suspend fun close() {
+      channel.cancel()
+      job?.cancelAndJoin()
+    }
     override suspend fun toList() = use { channel.toList() }
     override suspend fun <C : MutableCollection<in T>> toCollection(destination: C) =
       use { channel.toCollection(destination) }
+    suspend inline fun <R> use(block: (PostgresResultSet<T>) -> R): R {
+      return info.jdavid.asynk.core.internal.use(this) { block(this) }
+    }
   }
 
-  class PostgresResultMap<K,V> internal constructor(channel: Channel<Pair<K,V>>):
-        PostgresResultSet<Pair<K,V>>(channel), Connection.ResultMap<K,V> {
+  class PostgresResultMap<K,V> internal constructor(channel: Channel<Pair<K,V>>, job: Job? = null):
+        PostgresResultSet<Pair<K,V>>(channel, job), Connection.ResultMap<K,V> {
     override suspend fun toMap() = use { channel.toMap() }
     override suspend fun <M : MutableMap<in K, in V>> toMap(destination: M) =
       use { channel.toMap(destination) }
