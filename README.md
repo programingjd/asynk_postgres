@@ -1,4 +1,4 @@
-![jcenter](https://img.shields.io/badge/_jcenter_-0.0.0.19-6688ff.png?style=flat) &#x2003; ![jcenter](https://img.shields.io/badge/_Tests_-82/82-green.png?style=flat)
+![jcenter](https://img.shields.io/badge/_jcenter_-0.0.0.20-6688ff.png?style=flat) &#x2003; ![jcenter](https://img.shields.io/badge/_Tests_-82/82-green.png?style=flat)
 # Asynk POSTGRES
 A Postgres async client with suspend functions for kotlin coroutines.
 
@@ -7,7 +7,7 @@ A Postgres async client with suspend functions for kotlin coroutines.
 The maven artifacts are on [Bintray](https://bintray.com/programingjd/maven/info.jdavid.asynk.postgres/view)
 and [jcenter](https://bintray.com/search?query=info.jdavid.asynk.postgres).
 
-[Download](https://bintray.com/artifact/download/programingjd/maven/info/jdavid/asynk/postgres/0.0.0.19/postgres-0.0.0.19.jar) the latest jar.
+[Download](https://bintray.com/artifact/download/programingjd/maven/info/jdavid/asynk/postgres/0.0.0.20/postgres-0.0.0.20.jar) the latest jar.
 
 __Maven__
 
@@ -17,7 +17,7 @@ Include [those settings](https://bintray.com/repo/downloadMavenRepoSettingsFile/
 <dependency>
   <groupId>info.jdavid.asynk</groupId>
   <artifactId>postgres</artifactId>
-  <version>0.0.0.19</version>
+  <version>0.0.0.20</version>
 </dependency>
 ```
 __Gradle__
@@ -30,7 +30,7 @@ repositories {
 ```
 ```
 dependencies {
-  compile 'info.jdavid.asynk:postgres:0.0.0.19'
+  compile 'info.jdavid.asynk:postgres:0.0.0.20'
 }
 ```
 
@@ -56,8 +56,8 @@ __Fetching rows__
 
 ```kotlin
 val total: Int = 
-  connection.values("SELECT COUNT(*) as count FROM table;", "count").use {
-    it.iterator().next() // only one row
+  connection.values("SELECT COUNT(*) as count FROM table;", "count").iterate {
+    it.next() // only one row
   }
 
 val max = 123
@@ -66,18 +66,18 @@ val count: Int =
     "SELECT COUNT(*) as count FROM table WHERE id > ?;",
     listOf(max),
     "count"
-  ).use {
-    it.iterator().next() // only one value
+  ).iterate {
+    it.next() // only one value
   }
 
 val ids = ArrayList<Int>(count)
-connection.values("SELECT * FROM table WHERE id > ?", listOf(max), "id").use { it.toList(ids) }
+connection.values("SELECT * FROM table WHERE id > ?", listOf(max), "id").toList(ids)
 
 val names = Map<Int,String?>(count)
-connection.entries("SELECT id, name FROM table", "id", "name").use { it.toMap(map) }
+connection.entries("SELECT id, name FROM table", "id", "name").toMap(map)
 
 val json = com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(
-  connection.rows("SELECT * FROM table").use { it.toList(ids) }
+  connection.rows("SELECT * FROM table").toList(ids)
 )
 ```
 

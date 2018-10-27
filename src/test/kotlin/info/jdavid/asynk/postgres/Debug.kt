@@ -1,7 +1,7 @@
 package info.jdavid.asynk.postgres
 
+import info.jdavid.asynk.sql.*
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -50,8 +50,8 @@ class Debug {
                     SELECT name FROM test
                   """.trimIndent(),
                   "name"
-                ).use {
-                  it.iterator().next()
+                ).iterate {
+                  it.next()
                 }
                 println(firstName)
                 println("mapping")
