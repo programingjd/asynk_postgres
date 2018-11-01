@@ -1,9 +1,9 @@
 object ASYNK {
-  val version = "0.0.0.20"
+  val version = "0.0.0.21"
 }
 object KOTLIN {
-  val version = "1.3.0-rc-190"
+  val version = "1.3.0"
 }
 object KOTLINX {
-  val version = "1.0.0-RC1"
+  val version = "1.0.0"
 }
