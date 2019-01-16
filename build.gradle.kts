@@ -14,7 +14,7 @@ plugins {
   id("org.jetbrains.dokka") version "0.9.17"
   `maven-publish`
   id("com.jfrog.bintray") version "1.8.4"
-  id("io.gitlab.arturbosch.detekt").version("1.0.0-RC11")
+  id("io.gitlab.arturbosch.detekt").version("1.0.0-RC12")
 }
 
 group = "info.jdavid.asynk"
@@ -34,7 +34,7 @@ dependencies {
   testImplementation("org.junit.jupiter:junit-jupiter-params:5.3.2")
   testRuntime("org.junit.jupiter:junit-jupiter-engine:5.3.2")
   testRuntime("org.slf4j:slf4j-jdk14:1.7.25")
-  testImplementation("com.fasterxml.jackson.core:jackson-databind:2.9.7")
+  testImplementation("com.fasterxml.jackson.core:jackson-databind:2.9.8")
   testImplementation("org.apache.httpcomponents:httpclient:4.5.6")
 }
 

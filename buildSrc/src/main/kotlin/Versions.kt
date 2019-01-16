@@ -1,5 +1,5 @@
 object ASYNK {
-  val version = "0.0.0.25"
+  val version = "0.0.0.26"
 }
 object KOTLIN {
   val version = "1.3.11"
