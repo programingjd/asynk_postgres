@@ -36,7 +36,8 @@ object Docker {
     POSTGRES_105("library/postgres:10.5", 5437),
     POSTGRES_106("library/postgres:10.6", 5440),
     POSTGRES_110("library/postgres:11.0", 5441),
-    POSTGRES_111("library/postgres:11.1", 5442)
+    POSTGRES_111("library/postgres:11.1", 5442),
+    POSTGRES_112("library/postgres:11.2", 5443)
   }
 
   fun check() {
