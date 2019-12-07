@@ -11,10 +11,10 @@ import javax.xml.xpath.XPathFactory
 
 plugins {
   kotlin("jvm") version KOTLIN.version
-  id("org.jetbrains.dokka") version "0.9.17"
+  id("org.jetbrains.dokka") version "0.9.18"
   `maven-publish`
   id("com.jfrog.bintray") version "1.8.4"
-  id("io.gitlab.arturbosch.detekt").version("1.0.0-RC12")
+  id("io.gitlab.arturbosch.detekt").version("1.2.2")
 }
 
 group = "info.jdavid.asynk"
@@ -30,12 +30,12 @@ dependencies {
   implementation("info.jdavid.asynk:core:${ASYNK.version}")
   implementation("info.jdavid.asynk:sql:${ASYNK.version}")
   implementation("org.slf4j:slf4j-api:1.7.25")
-  testImplementation("org.junit.jupiter:junit-jupiter-api:5.3.2")
-  testImplementation("org.junit.jupiter:junit-jupiter-params:5.3.2")
-  testRuntime("org.junit.jupiter:junit-jupiter-engine:5.3.2")
+  testImplementation("org.junit.jupiter:junit-jupiter-api:5.5.2")
+  testImplementation("org.junit.jupiter:junit-jupiter-params:5.5.2")
+  testRuntime("org.junit.jupiter:junit-jupiter-engine:5.5.2")
   testRuntime("org.slf4j:slf4j-jdk14:1.7.25")
-  testImplementation("com.fasterxml.jackson.core:jackson-databind:2.9.8")
-  testImplementation("org.apache.httpcomponents:httpclient:4.5.6")
+  testImplementation("com.fasterxml.jackson.core:jackson-databind:2.10.1")
+  testImplementation("org.apache.httpcomponents:httpclient:4.5.10")
 }
 
 
